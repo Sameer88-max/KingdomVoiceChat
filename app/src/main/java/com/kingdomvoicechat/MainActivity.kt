@@ -51,7 +51,6 @@ class MainActivity : Activity() {
         brand.addView(text("KINGDOM", 22f, white, true))
         brand.addView(text("VOICE • CHAT • CONNECT", 10f, cyan, true))
         header.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
-
         header.addView(text("🔔", 23f, white, false))
         page.addView(header)
 
@@ -65,9 +64,11 @@ class MainActivity : Activity() {
         )
 
         hero.addView(text("YOUR WORLD. YOUR VOICE.", 11f, cyan, true))
+
         val heading = text("Find your people.", 29f, white, true)
         heading.setPadding(0, dp(12), 0, dp(8))
         hero.addView(heading)
+
         hero.addView(
             text(
                 "Join rooms, meet friends and share your moments.",
@@ -76,9 +77,9 @@ class MainActivity : Activity() {
         )
 
         val explore = tile("🎙", "Explore Voice Rooms", cyan) {
-    startActivity(Intent(this, RoomActivity::class.java))
+            openRooms()
         }
-    
+
         val ep = LinearLayout.LayoutParams(-1, -2)
         ep.topMargin = dp(18)
         hero.addView(explore, ep)
@@ -97,6 +98,7 @@ class MainActivity : Activity() {
                 notice("Owner Panel screen is not ready yet.")
             }
         }
+
         val ownerParams = LinearLayout.LayoutParams(-1, dp(85))
         ownerParams.topMargin = dp(18)
         page.addView(ownerPanel, ownerParams)
@@ -129,9 +131,18 @@ class MainActivity : Activity() {
         setContentView(scroll)
     }
 
+    private fun openRooms() {
+        try {
+            startActivity(Intent(this, RoomActivity::class.java))
+        } catch (e: Exception) {
+            notice("Voice Rooms screen could not be opened.")
+        }
+    }
+
     private fun section(page: LinearLayout, title: String, tag: String) {
         val row = LinearLayout(this)
         row.gravity = Gravity.CENTER_VERTICAL
+
         row.addView(
             text(title, 19f, white, true),
             LinearLayout.LayoutParams(0, -2, 1f)
@@ -161,6 +172,7 @@ class MainActivity : Activity() {
 
         val gap = LinearLayout.LayoutParams(0, dp(105), 1f)
         gap.leftMargin = dp(12)
+
         row.addView(
             tile(right.first, right.second, cyan) {
                 openOption(right.second)
@@ -186,6 +198,7 @@ class MainActivity : Activity() {
         box.background = gradient(intArrayOf(card, bg), 18)
 
         box.addView(text(icon, 24f, accent, true))
+
         val name = text(title, 14f, white, true)
         name.setPadding(0, dp(7), 0, 0)
         box.addView(name)
@@ -227,17 +240,25 @@ class MainActivity : Activity() {
 
     private fun openOption(name: String) {
         when (name) {
-            "Wallet" -> notice("Wallet: Coins, Pearls and seller withdrawal.")
-            "Gifts" -> notice("Gift catalogue and sending system comes next.")
-            "Voice Rooms", "Sub Rooms" ->
-                notice("Live audio requires voice-server integration.")
+            "Voice Rooms", "Sub Rooms" -> openRooms()
+
+            "Wallet" ->
+                notice("Wallet: Coins, Pearls and seller withdrawal.")
+
+            "Gifts" ->
+                notice("Gift catalogue and sending system comes next.")
+
             "My Profile", "Profile & DP" ->
                 notice("Profile editing will be connected next.")
+
             "Sign Out" ->
                 notice("Sign out will work after login is implemented.")
+
             "Delete Account" ->
                 notice("Secure account deletion needs confirmation.")
-            else -> notice("$name selected. Feature setup comes next.")
+
+            else ->
+                notice("$name selected. Feature setup comes next.")
         }
     }
 
