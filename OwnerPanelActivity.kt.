@@ -1,0 +1,168 @@
+
+package com.kingdomvoicechat
+
+import android.app.Activity
+import android.os.Bundle
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
+import android.widget.Toast
+
+class OwnerPanelActivity : Activity() {
+    private val bg = Color.rgb(12, 14, 35)
+    private val card = Color.rgb(27, 31, 65)
+    private val white = Color.WHITE
+    private val muted = Color.rgb(174, 181, 215)
+    private val cyan = Color.rgb(69, 226, 235)
+    private val purple = Color.rgb(150, 102, 255)
+    private val gold = Color.rgb(255, 190, 86)
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        window.statusBarColor = bg
+        window.navigationBarColor = bg
+
+        val scroll = ScrollView(this)
+        scroll.setBackgroundColor(bg)
+
+        val page = LinearLayout(this)
+        page.orientation = LinearLayout.VERTICAL
+        page.setPadding(dp(18), dp(18), dp(18), dp(28))
+        scroll.addView(page)
+
+        val back = text("‹  Back to Home", 15f, cyan, true)
+        back.setPadding(0, 0, 0, dp(18))
+        back.setOnClickListener { finish() }
+        page.addView(back)
+
+        page.addView(text("♛ OWNER CONTROL CENTRE", 22f, white, true))
+        page.addView(text(
+            "KINGDOM VOICE CHAT • MANAGEMENT",
+            12f, cyan, true
+        ))
+
+        addSection(page, "PEOPLE & ACCESS", listOf(
+            "User Management",
+            "Role Management & Permissions",
+            "App Administrator",
+            "Official Staff & Titles",
+            "Password Centre",
+            "Track Activity & Audit Logs",
+            "General Ban / Unban",
+            "Delete or Change Unique ID"
+        ))
+
+        addSection(page, "DESIGN & RECOGNITION", listOf(
+            "Frames Management",
+            "Badge Management",
+            "Official Titles & Privileges",
+            "Entry Effects",
+            "Room Theme",
+            "Room Theme Approval"
+        ))
+
+        addSection(page, "WALLET & GIFTS", listOf(
+            "Wallet Block / Unblock",
+            "Coins & Pearls Settings",
+            "Gift Catalogue & Gifting",
+            "Event Gifting",
+            "Gift Send Settings",
+            "Mall Send",
+            "Mall History",
+            "Birthday Gifts"
+        ))
+
+        addSection(page, "COMMUNITY & AGENCIES", listOf(
+            "Family Management",
+            "Family Levels",
+            "CP Relationships",
+            "BD Centre",
+            "BD Agencies",
+            "Room Sending",
+            "Moments",
+            "Broadcast Messages",
+            "VIP Management",
+            "VIP System / SVIP System",
+            "User Levels"
+        ))
+
+        addSection(page, "APP OPERATIONS", listOf(
+            "Maintenance Mode",
+            "Reports & Exports",
+            "Backup Status",
+            "Complaints & Hearings",
+            "Security Settings"
+        ))
+
+        page.addView(text(
+            "PREVIEW MODE: Live actions require database and server integration.",
+            11f, gold, false
+        ).apply { setPadding(0, dp(18), 0, 0) })
+
+        setContentView(scroll)
+    }
+
+    private fun addSection(
+        page: LinearLayout,
+        heading: String,
+        items: List<String>
+    ) {
+        page.addView(text(heading, 15f, cyan, true).apply {
+            setPadding(0, dp(22), 0, dp(10))
+        })
+
+        items.forEach { item ->
+            val row = LinearLayout(this)
+            row.gravity = Gravity.CENTER_VERTICAL
+            row.setPadding(dp(14), dp(15), dp(12), dp(15))
+            row.background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(card, bg)
+            ).apply { cornerRadius = dp(14).toFloat() }
+
+            val details = LinearLayout(this)
+            details.orientation = LinearLayout.VERTICAL
+            details.addView(text(item, 14f, white, true))
+            details.addView(text(
+                "Configuration pending",
+                10f, muted, false
+            ))
+
+            row.addView(details, LinearLayout.LayoutParams(0, -2, 1f))
+            row.addView(text("›", 25f, purple, true))
+
+            row.setOnClickListener {
+                Toast.makeText(
+                    this,
+                    "$item: server integration pending",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+
+            val params = LinearLayout.LayoutParams(-1, -2)
+            params.bottomMargin = dp(8)
+            page.addView(row, params)
+        }
+    }
+
+    private fun text(
+        value: String,
+        size: Float,
+        color: Int,
+        bold: Boolean
+    ): TextView {
+        return TextView(this).apply {
+            text = value
+            textSize = size
+            setTextColor(color)
+            if (bold) typeface = Typeface.DEFAULT_BOLD
+        }
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+}
