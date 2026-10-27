@@ -1,5 +1,6 @@
 
 package com.kingdomvoicechat
+
 import android.content.Intent
 import android.app.Activity
 import android.os.Bundle
@@ -68,8 +69,10 @@ class MainActivity : Activity() {
         heading.setPadding(0, dp(12), 0, dp(8))
         hero.addView(heading)
         hero.addView(
-            text("Join rooms, meet friends and share your moments.",
-                14f, white, false)
+            text(
+                "Join rooms, meet friends and share your moments.",
+                14f, white, false
+            )
         )
 
         val explore = tile("🎙", "Explore Voice Rooms", cyan) {
@@ -83,28 +86,26 @@ class MainActivity : Activity() {
         hp.topMargin = dp(22)
         page.addView(hero, hp)
 
+        // Owner Panel button
+        val ownerPanel = tile("👑", "OWNER PANEL", gold) {
+            try {
+                startActivity(
+                    Intent(this, OwnerPanelActivity::class.java)
+                )
+            } catch (e: Exception) {
+                notice("Owner Panel screen is not ready yet.")
+            }
+        }
+        val ownerParams = LinearLayout.LayoutParams(-1, dp(85))
+        ownerParams.topMargin = dp(18)
+        page.addView(ownerPanel, ownerParams)
+
         section(page, "Your Space", "QUICK ACCESS")
 
-        addGrid(
-            page,
-            Pair("🎙", "Voice Rooms"),
-            Pair("🏠", "Sub Rooms")
-        )
-        addGrid(
-            page,
-            Pair("🎁", "Gifts"),
-            Pair("💬", "Chat Messages")
-        )
-        addGrid(
-            page,
-            Pair("💎", "Wallet"),
-            Pair("👤", "My Profile")
-        )
-        addGrid(
-            page,
-            Pair("👥", "Followers"),
-            Pair("⭐", "Levels")
-        )
+        addGrid(page, Pair("🎙", "Voice Rooms"), Pair("🏠", "Sub Rooms"))
+        addGrid(page, Pair("🎁", "Gifts"), Pair("💬", "Chat Messages"))
+        addGrid(page, Pair("💎", "Wallet"), Pair("👤", "My Profile"))
+        addGrid(page, Pair("👥", "Followers"), Pair("⭐", "Levels"))
 
         section(page, "My Account", "SETTINGS")
 
@@ -127,16 +128,13 @@ class MainActivity : Activity() {
         setContentView(scroll)
     }
 
-    private fun section(
-        page: LinearLayout,
-        title: String,
-        tag: String
-    ) {
+    private fun section(page: LinearLayout, title: String, tag: String) {
         val row = LinearLayout(this)
         row.gravity = Gravity.CENTER_VERTICAL
-
-        row.addView(text(title, 19f, white, true),
-            LinearLayout.LayoutParams(0, -2, 1f))
+        row.addView(
+            text(title, 19f, white, true),
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
         row.addView(text(tag, 9f, cyan, true))
 
         val p = LinearLayout.LayoutParams(-1, -2)
@@ -219,7 +217,6 @@ class MainActivity : Activity() {
 
         row.addView(details, LinearLayout.LayoutParams(0, -2, 1f))
         row.addView(text("›", 27f, cyan, false))
-
         row.setOnClickListener { openOption(title) }
 
         val p = LinearLayout.LayoutParams(-1, -2)
