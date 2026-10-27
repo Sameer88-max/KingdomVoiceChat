@@ -76,7 +76,8 @@ class MainActivity : Activity() {
         )
 
         val explore = tile("🎙", "Explore Voice Rooms", cyan) {
-            notice("Voice rooms need server integration.")
+    startActivity(Intent(this, RoomActivity::class.java))
+        }
         }
         val ep = LinearLayout.LayoutParams(-1, -2)
         ep.topMargin = dp(18)
