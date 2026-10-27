@@ -1,6 +1,7 @@
 package com.kingdomvoicechat
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.graphics.Color
 import android.graphics.Typeface
@@ -39,8 +40,24 @@ class AuthActivity : Activity() {
         window.statusBarColor = bg
         window.navigationBarColor = bg
 
-        registering = auth.currentUser == null
+        // Already logged in: open Home Screen
+        if (auth.currentUser != null) {
+            openHome()
+            return
+        }
+
+        registering = true
         buildScreen()
+    }
+
+    private fun openHome() {
+        val intent = Intent(this, MainActivity::class.java)
+        intent.addFlags(
+            Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_CLEAR_TASK
+        )
+        startActivity(intent)
+        finish()
     }
 
     private fun buildScreen() {
@@ -56,19 +73,25 @@ class AuthActivity : Activity() {
         }
         scroll.addView(page)
 
-        page.addView(label("♛", 52f, cyan, true).apply {
-            gravity = Gravity.CENTER
-        }, LinearLayout.LayoutParams(-1, dp(70)))
+        page.addView(
+            label("♛", 52f, cyan, true).apply {
+                gravity = Gravity.CENTER
+            },
+            LinearLayout.LayoutParams(-1, dp(70))
+        )
 
-        page.addView(label("KINGDOM", 30f, white, true).apply {
-            gravity = Gravity.CENTER
-        })
+        page.addView(
+            label("KINGDOM", 30f, white, true).apply {
+                gravity = Gravity.CENTER
+            }
+        )
 
-        page.addView(label(
-            "VOICE  •  CHAT  •  CONNECT", 11f, cyan, true
-        ).apply {
-            gravity = Gravity.CENTER
-        })
+        page.addView(
+            label("VOICE  •  CHAT  •  CONNECT", 11f, cyan, true)
+                .apply {
+                    gravity = Gravity.CENTER
+                }
+        )
 
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -148,13 +171,15 @@ class AuthActivity : Activity() {
             }
         }
 
-        page.addView(label(
-            "SECURE EMAIL LOGIN • FIREBASE AUTH",
-            11f, muted, true
-        ).apply {
-            gravity = Gravity.CENTER
-            setPadding(0, dp(25), 0, 0)
-        })
+        page.addView(
+            label(
+                "SECURE EMAIL LOGIN • FIREBASE AUTH",
+                11f, muted, true
+            ).apply {
+                gravity = Gravity.CENTER
+                setPadding(0, dp(25), 0, 0)
+            }
+        )
 
         setContentView(scroll)
         updateForm()
@@ -216,7 +241,7 @@ class AuthActivity : Activity() {
 
                     if (task.isSuccessful) {
                         toast("Account successfully create ho gaya.")
-                        finish()
+                        openHome()
                     } else {
                         toast(
                             task.exception?.localizedMessage
@@ -231,7 +256,7 @@ class AuthActivity : Activity() {
 
                     if (task.isSuccessful) {
                         toast("Login successful.")
-                        finish()
+                        openHome()
                     } else {
                         toast(
                             task.exception?.localizedMessage
@@ -246,6 +271,7 @@ class AuthActivity : Activity() {
         busy = value
         action.isEnabled = !value
         action.alpha = if (value) 0.6f else 1f
+
         action.text = if (value) {
             "PLEASE WAIT..."
         } else if (registering) {
