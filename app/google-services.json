@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "772489983690",
+    "project_id": "kingdom-voice-chat",
+    "storage_bucket": "kingdom-voice-chat.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:772489983690:android:2b4afb611aeb8218bb6633",
+        "android_client_info": {
+          "package_name": "com.kingdomvoicechat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAU4_ttl0qdiUTNvqmKVxTdURx4DftjDio"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
