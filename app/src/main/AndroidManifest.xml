@@ -8,6 +8,10 @@
         android:supportsRtl="true">
 
         <activity
+            android:name=".RoomActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".OwnerPanelActivity"
             android:exported="false" />
 
