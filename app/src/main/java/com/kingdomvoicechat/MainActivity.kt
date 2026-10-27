@@ -1,9 +1,9 @@
 
 package com.kingdomvoicechat
 
-import android.content.Intent
 import android.app.Activity
 import android.os.Bundle
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -12,6 +12,8 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import android.app.AlertDialog
+import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : Activity() {
 
@@ -24,44 +26,70 @@ class MainActivity : Activity() {
     private val pink = Color.rgb(255, 105, 175)
     private val gold = Color.rgb(255, 190, 86)
 
+    private lateinit var page: LinearLayout
+    private var currentFeature: String? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         window.statusBarColor = bg
         window.navigationBarColor = bg
 
+        showHome()
+    }
+
+    override fun onBackPressed() {
+        if (currentFeature != null) {
+            showHome()
+        } else {
+            super.onBackPressed()
+        }
+    }
+
+    private fun showHome() {
+        currentFeature = null
+
         val scroll = ScrollView(this)
         scroll.setBackgroundColor(bg)
+        scroll.isFillViewport = true
 
-        val page = LinearLayout(this)
-        page.orientation = LinearLayout.VERTICAL
-        page.setPadding(dp(18), dp(20), dp(18), dp(24))
+        page = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(20), dp(18), dp(24))
+        }
+
         scroll.addView(page)
 
-        // Header
-        val header = LinearLayout(this)
-        header.gravity = Gravity.CENTER_VERTICAL
+        val header = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+        }
 
         val logo = text("♛", 30f, cyan, true)
         logo.gravity = Gravity.CENTER
         header.addView(logo, LinearLayout.LayoutParams(dp(48), dp(48)))
 
-        val brand = LinearLayout(this)
-        brand.orientation = LinearLayout.VERTICAL
-        brand.addView(text("KINGDOM", 22f, white, true))
-        brand.addView(text("VOICE • CHAT • CONNECT", 10f, cyan, true))
+        val brand = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(text("KINGDOM", 22f, white, true))
+            addView(text("VOICE • CHAT • CONNECT", 10f, cyan, true))
+        }
+
         header.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
-        header.addView(text("🔔", 23f, white, false))
+
+        val bell = text("🔔", 23f, white, false)
+        bell.setOnClickListener { showFeature("Notifications") }
+        header.addView(bell)
+
         page.addView(header)
 
-        // Hero banner
-        val hero = LinearLayout(this)
-        hero.orientation = LinearLayout.VERTICAL
-        hero.setPadding(dp(20), dp(22), dp(20), dp(20))
-        hero.background = gradient(
-            intArrayOf(Color.rgb(49, 39, 111), Color.rgb(16, 100, 125)),
-            24
-        )
+        val hero = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(22), dp(20), dp(20))
+            background = gradient(
+                intArrayOf(Color.rgb(49, 39, 111), Color.rgb(16, 100, 125)),
+                24
+            )
+        }
 
         hero.addView(text("YOUR WORLD. YOUR VOICE.", 11f, cyan, true))
 
@@ -80,22 +108,19 @@ class MainActivity : Activity() {
             openRooms()
         }
 
-        val ep = LinearLayout.LayoutParams(-1, -2)
-        ep.topMargin = dp(18)
-        hero.addView(explore, ep)
+        val exploreParams = LinearLayout.LayoutParams(-1, dp(85))
+        exploreParams.topMargin = dp(18)
+        hero.addView(explore, exploreParams)
 
-        val hp = LinearLayout.LayoutParams(-1, -2)
-        hp.topMargin = dp(22)
-        page.addView(hero, hp)
+        val heroParams = LinearLayout.LayoutParams(-1, -2)
+        heroParams.topMargin = dp(22)
+        page.addView(hero, heroParams)
 
-        // Owner Panel button
         val ownerPanel = tile("👑", "OWNER PANEL", gold) {
             try {
-                startActivity(
-                    Intent(this, OwnerPanelActivity::class.java)
-                )
+                startActivity(Intent(this, OwnerPanelActivity::class.java))
             } catch (e: Exception) {
-                notice("Owner Panel screen is not ready yet.")
+                notice("Owner Panel screen could not be opened.")
             }
         }
 
@@ -105,23 +130,69 @@ class MainActivity : Activity() {
 
         section(page, "Your Space", "QUICK ACCESS")
 
-        addGrid(page, Pair("🎙", "Voice Rooms"), Pair("🏠", "Sub Rooms"))
-        addGrid(page, Pair("🎁", "Gifts"), Pair("💬", "Chat Messages"))
-        addGrid(page, Pair("💎", "Wallet"), Pair("👤", "My Profile"))
-        addGrid(page, Pair("👥", "Followers"), Pair("⭐", "Levels"))
+        addGrid(
+            page,
+            "🎙", "Voice Rooms",
+            "🏠", "Sub Rooms"
+        )
+
+        addGrid(
+            page,
+            "🎁", "Gifts",
+            "💬", "Chat Messages"
+        )
+
+        addGrid(
+            page,
+            "💎", "Wallet",
+            "👤", "My Profile"
+        )
+
+        addGrid(
+            page,
+            "👥", "Followers",
+            "⭐", "Levels"
+        )
 
         section(page, "My Account", "SETTINGS")
 
-        addRow(page, "🖼", "Profile & DP", "Name, photo and user details", purple)
-        addRow(page, "🌍", "Country, Age & Gender", "Manage profile information", cyan)
-        addRow(page, "🔐", "Update Password", "Account security", gold)
-        addRow(page, "⚙", "Settings", "Privacy and preferences", purple)
-        addRow(page, "❓", "Help & Customer Contact", "Support and assistance", cyan)
-        addRow(page, "🚪", "Sign Out", "Sign out of this device", pink)
-        addRow(page, "🗑", "Delete Account", "Account deletion request", pink)
+        addRow(
+            page, "🖼", "Profile & DP",
+            "Name, photo and user details", purple
+        )
+
+        addRow(
+            page, "🌍", "Country, Age & Gender",
+            "Manage profile information", cyan
+        )
+
+        addRow(
+            page, "🔐", "Update Password",
+            "Account security", gold
+        )
+
+        addRow(
+            page, "⚙", "Settings",
+            "Privacy and preferences", purple
+        )
+
+        addRow(
+            page, "❓", "Help & Customer Contact",
+            "Support and assistance", cyan
+        )
+
+        addRow(
+            page, "🚪", "Sign Out",
+            "Sign out of this device", pink
+        )
+
+        addRow(
+            page, "🗑", "Delete Account",
+            "Request account deletion", pink
+        )
 
         val footer = text(
-            "KINGDOM VOICE CHAT • HOME PREVIEW",
+            "KINGDOM VOICE CHAT",
             10f, muted, true
         )
         footer.gravity = Gravity.CENTER
@@ -129,6 +200,154 @@ class MainActivity : Activity() {
         page.addView(footer)
 
         setContentView(scroll)
+    }
+
+    private fun showFeature(name: String) {
+        currentFeature = name
+
+        val scroll = ScrollView(this)
+        scroll.setBackgroundColor(bg)
+        scroll.isFillViewport = true
+
+        val screen = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(24), dp(20), dp(28))
+        }
+
+        scroll.addView(screen)
+
+        val back = tile("‹", "BACK TO HOME", cyan) {
+            showHome()
+        }
+
+        screen.addView(
+            back,
+            LinearLayout.LayoutParams(-1, dp(62))
+        )
+
+        val title = text(name, 27f, white, true)
+        title.setPadding(0, dp(28), 0, dp(8))
+        screen.addView(title)
+
+        screen.addView(
+            text(
+                "KINGDOM VOICE CHAT",
+                12f, cyan, true
+            )
+        )
+
+        val info = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(20), dp(18), dp(20))
+            background = gradient(intArrayOf(card, bg), 20)
+        }
+
+        val description = when (name) {
+            "Sub Rooms" ->
+                "Explore and manage sub-room options."
+
+            "Gifts" ->
+                "Gift catalogue and gift sending will be connected to the secure wallet."
+
+            "Chat Messages" ->
+                "Private text messages, conversation list and friend chat will be connected here."
+
+            "Wallet" ->
+                "Your coin balance, Pearls, transaction history and seller requests will appear here."
+
+            "My Profile", "Profile & DP" ->
+                "Your profile name, photo, user ID and account details will be managed here."
+
+            "Followers" ->
+                "Your followers and following lists will appear here."
+
+            "Levels" ->
+                "Your activity level and level progress will appear here."
+
+            "Country, Age & Gender" ->
+                "Your profile information will be managed here."
+
+            "Update Password" ->
+                "Use the secure password update process for your account."
+
+            "Settings" ->
+                "Privacy, notifications and app preferences will be configured here."
+
+            "Help & Customer Contact" ->
+                "Customer support and complaint submission will be connected here."
+
+            "Notifications" ->
+                "Your app notifications will appear here."
+
+            "Delete Account" ->
+                "Account deletion requires identity checks and explicit confirmation."
+
+            else ->
+                "This section is ready for its next implementation phase."
+        }
+
+        info.addView(text("FEATURE CENTRE", 12f, cyan, true))
+
+        val detail = text(description, 15f, white, false)
+        detail.setPadding(0, dp(12), 0, dp(12))
+        info.addView(detail)
+
+        info.addView(
+            text(
+                "Status: Screen navigation ready. Feature/backend integration pending.",
+                12f, gold, false
+            )
+        )
+
+        val infoParams = LinearLayout.LayoutParams(-1, -2)
+        infoParams.topMargin = dp(22)
+        screen.addView(info, infoParams)
+
+        when (name) {
+            "My Profile", "Profile & DP" -> {
+                addFeatureButton(screen, "EDIT PROFILE") {
+                    notice("Profile editor is not connected yet.")
+                }
+            }
+
+            "Update Password" -> {
+                addFeatureButton(screen, "UPDATE PASSWORD") {
+                    notice("Secure password update screen is next.")
+                }
+            }
+
+            "Help & Customer Contact" -> {
+                addFeatureButton(screen, "CONTACT SUPPORT") {
+                    notice("Customer support backend is not connected yet.")
+                }
+            }
+
+            "Delete Account" -> {
+                addFeatureButton(screen, "REQUEST ACCOUNT DELETION") {
+                    AlertDialog.Builder(this)
+                        .setTitle("Delete account")
+                        .setMessage(
+                            "Account deletion is not enabled yet. No account has been deleted."
+                        )
+                        .setNegativeButton("CANCEL", null)
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }
+        }
+
+        setContentView(scroll)
+    }
+
+    private fun addFeatureButton(
+        screen: LinearLayout,
+        label: String,
+        action: () -> Unit
+    ) {
+        val button = tile("›", label, cyan, action)
+        val params = LinearLayout.LayoutParams(-1, dp(70))
+        params.topMargin = dp(14)
+        screen.addView(button, params)
     }
 
     private fun openRooms() {
@@ -139,50 +358,100 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun section(page: LinearLayout, title: String, tag: String) {
-        val row = LinearLayout(this)
-        row.gravity = Gravity.CENTER_VERTICAL
+    private fun openOption(name: String) {
+        when (name) {
+            "Voice Rooms" -> openRooms()
+
+            "Owner Panel" -> {
+                try {
+                    startActivity(Intent(this, OwnerPanelActivity::class.java))
+                } catch (e: Exception) {
+                    notice("Owner Panel screen could not be opened.")
+                }
+            }
+
+            "Sign Out" -> confirmSignOut()
+
+            else -> showFeature(name)
+        }
+    }
+
+    private fun confirmSignOut() {
+        AlertDialog.Builder(this)
+            .setTitle("Sign out?")
+            .setMessage("Do you want to sign out of Kingdom Voice Chat on this device?")
+            .setNegativeButton("CANCEL", null)
+            .setPositiveButton("SIGN OUT") { _, _ ->
+                try {
+                    FirebaseAuth.getInstance().signOut()
+
+                    val intent = Intent(this, AuthActivity::class.java)
+                    intent.addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    )
+                    startActivity(intent)
+                    finish()
+                } catch (e: Exception) {
+                    notice("Sign out failed. Please try again.")
+                }
+            }
+            .show()
+    }
+
+    private fun section(
+        target: LinearLayout,
+        title: String,
+        tag: String
+    ) {
+        val row = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+        }
 
         row.addView(
             text(title, 19f, white, true),
             LinearLayout.LayoutParams(0, -2, 1f)
         )
+
         row.addView(text(tag, 9f, cyan, true))
 
-        val p = LinearLayout.LayoutParams(-1, -2)
-        p.topMargin = dp(24)
-        p.bottomMargin = dp(12)
-        page.addView(row, p)
+        val params = LinearLayout.LayoutParams(-1, -2)
+        params.topMargin = dp(24)
+        params.bottomMargin = dp(12)
+        target.addView(row, params)
     }
 
     private fun addGrid(
-        page: LinearLayout,
-        left: Pair<String, String>,
-        right: Pair<String, String>
+        target: LinearLayout,
+        leftIcon: String,
+        leftTitle: String,
+        rightIcon: String,
+        rightTitle: String
     ) {
-        val row = LinearLayout(this)
-        row.orientation = LinearLayout.HORIZONTAL
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
 
         row.addView(
-            tile(left.first, left.second, purple) {
-                openOption(left.second)
+            tile(leftIcon, leftTitle, purple) {
+                openOption(leftTitle)
             },
             LinearLayout.LayoutParams(0, dp(105), 1f)
         )
 
-        val gap = LinearLayout.LayoutParams(0, dp(105), 1f)
-        gap.leftMargin = dp(12)
+        val rightParams = LinearLayout.LayoutParams(0, dp(105), 1f)
+        rightParams.leftMargin = dp(12)
 
         row.addView(
-            tile(right.first, right.second, cyan) {
-                openOption(right.second)
+            tile(rightIcon, rightTitle, cyan) {
+                openOption(rightTitle)
             },
-            gap
+            rightParams
         )
 
-        val p = LinearLayout.LayoutParams(-1, -2)
-        p.bottomMargin = dp(12)
-        page.addView(row, p)
+        val params = LinearLayout.LayoutParams(-1, -2)
+        params.bottomMargin = dp(12)
+        target.addView(row, params)
     }
 
     private fun tile(
@@ -191,11 +460,14 @@ class MainActivity : Activity() {
         accent: Int,
         action: () -> Unit
     ): LinearLayout {
-        val box = LinearLayout(this)
-        box.orientation = LinearLayout.VERTICAL
-        box.gravity = Gravity.CENTER_VERTICAL
-        box.setPadding(dp(14), dp(12), dp(10), dp(12))
-        box.background = gradient(intArrayOf(card, bg), 18)
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(12), dp(10), dp(12))
+            background = gradient(intArrayOf(card, bg), 18)
+            isClickable = true
+            isFocusable = true
+        }
 
         box.addView(text(icon, 24f, accent, true))
 
@@ -208,58 +480,39 @@ class MainActivity : Activity() {
     }
 
     private fun addRow(
-        page: LinearLayout,
+        target: LinearLayout,
         icon: String,
         title: String,
         subtitle: String,
         accent: Int
     ) {
-        val row = LinearLayout(this)
-        row.gravity = Gravity.CENTER_VERTICAL
-        row.setPadding(dp(14), dp(14), dp(12), dp(14))
-        row.background = gradient(intArrayOf(card, bg), 16)
+        val row = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(14), dp(12), dp(14))
+            background = gradient(intArrayOf(card, bg), 16)
+            isClickable = true
+            isFocusable = true
+        }
 
         val symbol = text(icon, 23f, accent, true)
         symbol.gravity = Gravity.CENTER
         row.addView(symbol, LinearLayout.LayoutParams(dp(42), dp(42)))
 
-        val details = LinearLayout(this)
-        details.orientation = LinearLayout.VERTICAL
-        details.setPadding(dp(12), 0, 0, 0)
-        details.addView(text(title, 14f, white, true))
-        details.addView(text(subtitle, 11f, muted, false))
+        val details = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), 0, 0, 0)
+            addView(text(title, 14f, white, true))
+            addView(text(subtitle, 11f, muted, false))
+        }
 
         row.addView(details, LinearLayout.LayoutParams(0, -2, 1f))
         row.addView(text("›", 27f, cyan, false))
+
         row.setOnClickListener { openOption(title) }
 
-        val p = LinearLayout.LayoutParams(-1, -2)
-        p.bottomMargin = dp(10)
-        page.addView(row, p)
-    }
-
-    private fun openOption(name: String) {
-        when (name) {
-            "Voice Rooms", "Sub Rooms" -> openRooms()
-
-            "Wallet" ->
-                notice("Wallet: Coins, Pearls and seller withdrawal.")
-
-            "Gifts" ->
-                notice("Gift catalogue and sending system comes next.")
-
-            "My Profile", "Profile & DP" ->
-                notice("Profile editing will be connected next.")
-
-            "Sign Out" ->
-                notice("Sign out will work after login is implemented.")
-
-            "Delete Account" ->
-                notice("Secure account deletion needs confirmation.")
-
-            else ->
-                notice("$name selected. Feature setup comes next.")
-        }
+        val params = LinearLayout.LayoutParams(-1, -2)
+        params.bottomMargin = dp(10)
+        target.addView(row, params)
     }
 
     private fun text(
