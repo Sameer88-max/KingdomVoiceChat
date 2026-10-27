@@ -78,7 +78,7 @@ class MainActivity : Activity() {
         val explore = tile("🎙", "Explore Voice Rooms", cyan) {
     startActivity(Intent(this, RoomActivity::class.java))
         }
-        }
+    
         val ep = LinearLayout.LayoutParams(-1, -2)
         ep.topMargin = dp(18)
         hero.addView(explore, ep)
