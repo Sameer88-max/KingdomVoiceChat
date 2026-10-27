@@ -1,22 +1,29 @@
-
 package com.kingdomvoicechat
 
 import android.app.Activity
-import android.animation.ValueAnimator
 import android.os.Bundle
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
-import android.view.animation.LinearInterpolator
 import android.widget.*
 import android.text.InputType
+import com.google.firebase.auth.FirebaseAuth
 
 class AuthActivity : Activity() {
 
-    private val prefs by lazy {
-        getSharedPreferences("kingdom_auth_demo", MODE_PRIVATE)
-    }
+    private lateinit var auth: FirebaseAuth
+    private lateinit var email: EditText
+    private lateinit var password: EditText
+    private lateinit var confirmPassword: EditText
+    private lateinit var form: LinearLayout
+    private lateinit var heading: TextView
+    private lateinit var subtitle: TextView
+    private lateinit var action: TextView
+    private lateinit var switchText: TextView
+
+    private var registering = true
+    private var busy = false
 
     private val bg = Color.rgb(10, 12, 32)
     private val white = Color.WHITE
@@ -25,53 +32,43 @@ class AuthActivity : Activity() {
     private val purple = Color.rgb(155, 91, 255)
     private val pink = Color.rgb(255, 78, 180)
 
-    private lateinit var page: LinearLayout
-    private lateinit var form: LinearLayout
-    private lateinit var email: EditText
-    private lateinit var password: EditText
-    private lateinit var confirm: EditText
-    private lateinit var heading: TextView
-    private lateinit var subtitle: TextView
-    private lateinit var action: TextView
-    private lateinit var switchText: TextView
-    private var registering = true
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        auth = FirebaseAuth.getInstance()
         window.statusBarColor = bg
         window.navigationBarColor = bg
 
-        registering = !prefs.getBoolean("registered", false)
-        showScreen()
-        animateColours()
+        registering = auth.currentUser == null
+        buildScreen()
     }
 
-    private fun showScreen() {
-        val scroll = ScrollView(this)
-        scroll.setBackgroundColor(bg)
-        scroll.isFillViewport = true
+    private fun buildScreen() {
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(bg)
+            isFillViewport = true
+        }
 
-        page = LinearLayout(this).apply {
+        val page = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(24), dp(35), dp(24), dp(30))
+            setPadding(dp(24), dp(40), dp(24), dp(30))
         }
         scroll.addView(page)
 
-        val crown = label("♛", 52f, cyan, true)
-        crown.gravity = Gravity.CENTER
-        page.addView(crown, LinearLayout.LayoutParams(-1, dp(70)))
+        page.addView(label("♛", 52f, cyan, true).apply {
+            gravity = Gravity.CENTER
+        }, LinearLayout.LayoutParams(-1, dp(70)))
 
-        val brand = label("KINGDOM", 30f, white, true)
-        brand.gravity = Gravity.CENTER
-        page.addView(brand)
+        page.addView(label("KINGDOM", 30f, white, true).apply {
+            gravity = Gravity.CENTER
+        })
 
-        val tagline = label(
+        page.addView(label(
             "VOICE  •  CHAT  •  CONNECT", 11f, cyan, true
-        )
-        tagline.gravity = Gravity.CENTER
-        page.addView(tagline)
+        ).apply {
+            gravity = Gravity.CENTER
+        })
 
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -88,13 +85,14 @@ class AuthActivity : Activity() {
             }
         }
 
-        val cardParams = LinearLayout.LayoutParams(-1, -2)
-        cardParams.topMargin = dp(28)
-        page.addView(card, cardParams)
+        page.addView(card, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(28)
+        })
 
         heading = label("", 24f, white, true)
-        subtitle = label("", 13f, muted, false)
-        subtitle.setPadding(0, dp(8), 0, dp(22))
+        subtitle = label("", 13f, muted, false).apply {
+            setPadding(0, dp(8), 0, dp(22))
+        }
 
         card.addView(heading)
         card.addView(subtitle)
@@ -116,7 +114,7 @@ class AuthActivity : Activity() {
                 InputType.TYPE_TEXT_VARIATION_PASSWORD
         )
 
-        confirm = field(
+        confirmPassword = field(
             "Confirm password",
             InputType.TYPE_CLASS_TEXT or
                 InputType.TYPE_TEXT_VARIATION_PASSWORD
@@ -132,39 +130,42 @@ class AuthActivity : Activity() {
             }
         }
 
-        val actionParams = LinearLayout.LayoutParams(-1, dp(54))
-        actionParams.topMargin = dp(10)
-        card.addView(action, actionParams)
+        card.addView(action, LinearLayout.LayoutParams(-1, dp(54)).apply {
+            topMargin = dp(10)
+        })
         action.setOnClickListener { submit() }
 
-        switchText = label("", 13f, cyan, true)
-        switchText.gravity = Gravity.CENTER
-        switchText.setPadding(0, dp(22), 0, dp(4))
-        card.addView(switchText)
-
-        switchText.setOnClickListener {
-            registering = !registering
-            showForm()
+        switchText = label("", 13f, cyan, true).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, dp(22), 0, dp(4))
         }
 
-        val footer = label(
-            "EMAIL LOGIN  •  NO OTP REQUIRED",
+        card.addView(switchText)
+        switchText.setOnClickListener {
+            if (!busy) {
+                registering = !registering
+                updateForm()
+            }
+        }
+
+        page.addView(label(
+            "SECURE EMAIL LOGIN • FIREBASE AUTH",
             11f, muted, true
-        )
-        footer.gravity = Gravity.CENTER
-        footer.setPadding(0, dp(25), 0, 0)
-        page.addView(footer)
+        ).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, dp(25), 0, 0)
+        })
 
         setContentView(scroll)
-        showForm()
+        updateForm()
     }
 
-    private fun showForm() {
+    private fun updateForm() {
         heading.text = if (registering)
             "Create Account" else "Welcome Back"
 
         subtitle.text = if (registering)
-            "Register once with your email and password."
+            "Register with your email and password."
         else
             "Log in with your registered account."
 
@@ -172,59 +173,85 @@ class AuthActivity : Activity() {
         form.addView(email)
         form.addView(password)
 
-        if (registering) form.addView(confirm)
+        if (registering) {
+            form.addView(confirmPassword)
+        }
 
         action.text = if (registering)
             "CREATE ACCOUNT" else "LOG IN"
 
         switchText.text = if (registering)
-            "Already registered?  Log in"
+            "Already registered? Log in"
         else
-            "New here?  Create account"
+            "New here? Create account"
     }
 
     private fun submit() {
+        if (busy) return
+
         val e = email.text.toString().trim().lowercase()
         val p = password.text.toString()
 
         if (!android.util.Patterns.EMAIL_ADDRESS.matcher(e).matches()) {
-            toast("Valid email address enter karo.")
+            toast("Valid email address enter karein.")
             return
         }
 
         if (p.length < 8) {
-            toast("Password at least 8 characters ka hona chahiye.")
+            toast("Password kam az kam 8 characters ka hona chahiye.")
             return
         }
 
+        if (registering && p != confirmPassword.text.toString()) {
+            toast("Passwords match nahi karte.")
+            return
+        }
+
+        setBusy(true)
+
         if (registering) {
-            if (p != confirm.text.toString()) {
-                toast("Passwords match nahi karte.")
-                return
-            }
+            auth.createUserWithEmailAndPassword(e, p)
+                .addOnCompleteListener(this) { task ->
+                    setBusy(false)
 
-            // Temporary UI demo only.
-            // Real registration and secure password storage
-            // must be implemented by the backend.
-            prefs.edit()
-                .putBoolean("registered", true)
-                .putString("registered_email", e)
-                .apply()
-
-            registering = false
-            email.setText(e)
-            password.setText("")
-            showForm()
-            toast("Registration demo complete. Ab login karo.")
+                    if (task.isSuccessful) {
+                        toast("Account successfully create ho gaya.")
+                        finish()
+                    } else {
+                        toast(
+                            task.exception?.localizedMessage
+                                ?: "Registration fail ho gayi."
+                        )
+                    }
+                }
         } else {
-            val savedEmail = prefs.getString("registered_email", null)
+            auth.signInWithEmailAndPassword(e, p)
+                .addOnCompleteListener(this) { task ->
+                    setBusy(false)
 
-            if (savedEmail == null || e != savedEmail) {
-                toast("Pehle isi device par registration karo.")
-                return
-            }
+                    if (task.isSuccessful) {
+                        toast("Login successful.")
+                        finish()
+                    } else {
+                        toast(
+                            task.exception?.localizedMessage
+                                ?: "Login fail ho gaya."
+                        )
+                    }
+                }
+        }
+    }
 
-            toast("Login verification backend connect hone ke baad chalegi.")
+    private fun setBusy(value: Boolean) {
+        busy = value
+        action.isEnabled = !value
+        action.alpha = if (value) 0.6f else 1f
+        action.text = if (value) {
+            "PLEASE WAIT..."
+        } else if (registering) {
+            "CREATE ACCOUNT"
+        } else {
+            "LOG IN"
         }
     }
 
@@ -250,45 +277,18 @@ class AuthActivity : Activity() {
         }
     }
 
-    private fun animateColours() {
-        ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 2800
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.REVERSE
-            interpolator = LinearInterpolator()
-
-            addUpdateListener {
-                val value = it.animatedValue as Float
-                val colour = blend(purple, cyan, value)
-
-                window.statusBarColor = blend(bg, colour, 0.4f)
-                window.navigationBarColor = blend(bg, pink, value * 0.3f)
-            }
-
-            start()
-        }
-    }
-
-    private fun blend(a: Int, b: Int, ratio: Float): Int {
-        val r = ratio.coerceIn(0f, 1f)
-
-        return Color.rgb(
-            (Color.red(a) * (1-r) + Color.red(b) * r).toInt(),
-            (Color.green(a) * (1-r) + Color.green(b) * r).toInt(),
-            (Color.blue(a) * (1-r) + Color.blue(b) * r).toInt()
-        )
-    }
-
     private fun label(
         value: String,
         size: Float,
         colour: Int,
         bold: Boolean
-    ) = TextView(this).apply {
-        text = value
-        textSize = size
-        setTextColor(colour)
-        if (bold) typeface = Typeface.DEFAULT_BOLD
+    ): TextView {
+        return TextView(this).apply {
+            text = value
+            textSize = size
+            setTextColor(colour)
+            if (bold) typeface = Typeface.DEFAULT_BOLD
+        }
     }
 
     private fun dp(value: Int): Int =
