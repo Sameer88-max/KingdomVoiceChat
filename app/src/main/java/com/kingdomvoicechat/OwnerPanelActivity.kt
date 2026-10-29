@@ -1,3 +1,4 @@
+
 package com.kingdomvoicechat
 
 import android.app.Activity
@@ -7,441 +8,263 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
+import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
 
 class OwnerPanelActivity : Activity() {
 
-    private val bg = Color.rgb(12, 14, 35)
-    private val card = Color.rgb(27, 31, 65)
-    private val white = Color.WHITE
-    private val muted = Color.rgb(174, 181, 215)
-    private val cyan = Color.rgb(69, 226, 235)
-    private val purple = Color.rgb(150, 102, 255)
-    private val pink = Color.rgb(255, 105, 175)
-    private val gold = Color.rgb(255, 190, 86)
-
-    private lateinit var content: LinearLayout
+    private val bgColor = Color.rgb(13, 10, 32)
+    private val cardColor = Color.rgb(31, 24, 63)
+    private val accentColor = Color.rgb(0, 220, 255)
+    private val purpleColor = Color.rgb(130, 75, 255)
+    private val textColor = Color.WHITE
+    private val mutedColor = Color.rgb(190, 184, 220)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        window.statusBarColor = bg
-        window.navigationBarColor = bg
-
-        showPanel()
-    }
-
-    override fun onBackPressed() {
-        finish()
-    }
-
-    private fun showPanel() {
-        val scroll = ScrollView(this).apply {
-            setBackgroundColor(bg)
-            isFillViewport = true
-        }
-
-        content = LinearLayout(this).apply {
+        val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(20), dp(18), dp(28))
+            setBackgroundColor(bgColor)
         }
 
-        scroll.addView(content)
-
-        // Header
         val header = LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val back = makeText("‹", 34f, cyan, true).apply {
+            orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setOnClickListener { finish() }
-        }
-
-        header.addView(back, LinearLayout.LayoutParams(dp(45), dp(50)))
-
-        val titleBox = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(makeText("KINGDOM OWNER", 20f, white, true))
-            addView(makeText("CONTROL CENTRE", 11f, cyan, true))
-        }
-
-        header.addView(
-            titleBox,
-            LinearLayout.LayoutParams(0, -2, 1f)
-        )
-
-        header.addView(makeText("👑", 28f, gold, true))
-        content.addView(header)
-
-        // Hero panel
-        val hero = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(22), dp(20), dp(22))
-            background = gradient(
+            setPadding(20, 28, 20, 24)
+            background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
                 intArrayOf(
-                    Color.rgb(74, 42, 148),
-                    Color.rgb(15, 104, 130)
-                ),
-                24
-            )
+                    Color.rgb(48, 20, 100),
+                    Color.rgb(17, 49, 104)
+                )
+            ).apply {
+                cornerRadius = dp(18).toFloat()
+            }
         }
 
-        hero.addView(makeText("👑  OWNER DASHBOARD", 12f, cyan, true))
-
-        val heroTitle = makeText(
-            "Manage Your Kingdom",
-            27f, white, true
-        )
-        heroTitle.setPadding(0, dp(12), 0, dp(8))
-        hero.addView(heroTitle)
-
-        hero.addView(
-            makeText(
-                "Manage staff, review activity and configure app features.",
-                13f, white, false
+        header.addView(label("👑 KINGDOM VOICE CHAT", 15, accentColor, true))
+        header.addView(label("OWNER CONTROL PANEL", 25, textColor, true))
+        header.addView(
+            label(
+                "Dashboard • Management • Settings",
+                13,
+                mutedColor,
+                false
             )
         )
 
-        val heroParams = LinearLayout.LayoutParams(-1, -2)
-        heroParams.topMargin = dp(22)
-        content.addView(hero, heroParams)
-
-        // Notice about demo status
-        val notice = LinearLayout(this).apply {
+        val scroll = ScrollView(this)
+        val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(14), dp(14), dp(14))
-            background = gradient(
-                intArrayOf(Color.rgb(69, 51, 25), Color.rgb(38, 30, 47)),
-                16
-            )
+            setPadding(16, 16, 16, 24)
         }
 
-        notice.addView(makeText("⚠ DEMO PANEL", 12f, gold, true))
+        content.addView(header, marginParams(bottom = 18))
 
-        val noticeText = makeText(
-            "These controls currently open demo information only. " +
-                "They do not change live users, permissions, payments or server settings.",
-            12f, white, false
-        )
-        noticeText.setPadding(0, dp(8), 0, 0)
-        notice.addView(noticeText)
+        val warning = label(
+            "⚠ DEMO PANEL — Real owner security and database actions are not connected yet.",
+            13,
+            Color.rgb(255, 220, 120),
+            true
+        ).apply {
+            setPadding(14, 14, 14, 14)
+            background = rounded(Color.rgb(64, 43, 25), 12)
+        }
+        content.addView(warning, marginParams(bottom = 20))
 
-        val noticeParams = LinearLayout.LayoutParams(-1, -2)
-        noticeParams.topMargin = dp(14)
-        content.addView(notice, noticeParams)
-
-        // Overview cards
-        addSection("Overview", "DASHBOARD")
+        content.addView(sectionTitle("OWNER DASHBOARD"))
 
         val stats = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
         }
 
         stats.addView(
-            statCard("16", "Demo Seats", cyan),
-            LinearLayout.LayoutParams(0, dp(95), 1f)
+            statCard("TOTAL USERS", "—", "Live data pending"),
+            LinearLayout.LayoutParams(0, dp(108), 1f).apply {
+                marginEnd = dp(6)
+            }
         )
-
-        val secondStat = LinearLayout.LayoutParams(0, dp(95), 1f)
-        secondStat.leftMargin = dp(10)
-
         stats.addView(
-            statCard("12", "Role Types", purple),
-            secondStat
+            statCard("ACTIVE ROOMS", "—", "Live data pending"),
+            LinearLayout.LayoutParams(0, dp(108), 1f).apply {
+                marginStart = dp(6)
+            }
+        )
+        content.addView(stats, marginParams(bottom = 22))
+
+        content.addView(sectionTitle("MANAGEMENT & CONTROLS"))
+
+        val options = listOf(
+            "👥  User Management" to
+                "View users, account status, and user reports.",
+            "🛡️  Staff & Role Management" to
+                "Manage staff roles and permissions.",
+            "🏢  Agency & BD Management" to
+                "Agency registration, BD management, and reports.",
+            "🎧  Customer Service" to
+                "Customer support requests and service staff.",
+            "⚖️  Complaints & Hearings" to
+                "Review complaints, evidence, and hearing records.",
+            "🎙️  Voice Room Settings" to
+                "Room configuration, microphone seats, and moderation options.",
+            "🎁  Gift Management" to
+                "Configure gift names, coin prices, and gift availability.",
+            "💰  Coins & Pearls" to
+                "Review coin and pearl settings. Real transactions are not connected.",
+            "🪙  Seller Management" to
+                "Coin seller profiles, recharge records, and seller reviews.",
+            "📜  Policies & Rules" to
+                "Manage app policies and community guidelines.",
+            "🔔  Notifications" to
+                "Prepare announcements and notification settings.",
+            "⚙️  App Configuration" to
+                "App name, theme, language, and general settings.",
+            "🔐  Security Settings" to
+                "Security configuration and access-control planning.",
+            "📊  Reports & Activity" to
+                "Reports, activity history, and administrative review.",
+            "💾  Backup & Data" to
+                "Backup configuration and data-management options."
         )
 
-        val statsParams = LinearLayout.LayoutParams(-1, -2)
-        statsParams.bottomMargin = dp(6)
-        content.addView(stats, statsParams)
+        options.forEach { (title, description) ->
+            val item = TextView(this).apply {
+                text = title
+                textSize = 16f
+                setTextColor(textColor)
+                typeface = Typeface.DEFAULT_BOLD
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(16, 17, 16, 17)
+                background = rounded(cardColor, 14)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    showFeatureDialog(title, description)
+                }
+            }
 
-        // User and staff management
-        addSection("People & Staff", "MANAGEMENT")
+            content.addView(item, marginParams(bottom = 10))
+        }
 
-        addOption(
-            "👥",
-            "User Management",
-            "View user management options",
-            cyan
-        )
-
-        addOption(
-            "🛡",
-            "Staff & Role Management",
-            "Official staff, admins and role descriptions",
-            purple
-        )
-
-        addOption(
-            "🏢",
-            "Agency & BD Management",
-            "Agency leaders, BD and merchant options",
-            gold
-        )
-
-        addOption(
-            "🎧",
-            "Customer Service",
-            "Support and customer assistance options",
-            cyan
-        )
-
-        addOption(
-            "⚖",
-            "Complaints & Hearings",
-            "Complaint review and hearing workflow",
-            pink
-        )
-
-        // App management
-        addSection("App Management", "CONFIGURATION")
-
-        addOption(
-            "🎙",
-            "Voice Room Settings",
-            "Room seats, room controls and room rules",
-            cyan
-        )
-
-        addOption(
-            "🎁",
-            "Gift Management",
-            "Gift catalogue and gift configuration",
-            pink
-        )
-
-        addOption(
-            "💎",
-            "Coins & Pearls",
-            "Currency rules and transaction review options",
-            gold
-        )
-
-        addOption(
-            "💰",
-            "Seller Management",
-            "Coin sellers and seller approval workflow",
-            purple
-        )
-
-        addOption(
-            "📜",
-            "Policies & Rules",
-            "Community policies and app rules",
-            cyan
-        )
-
-        addOption(
-            "🔔",
-            "Notifications",
-            "Notification configuration options",
-            gold
-        )
-
-        addOption(
-            "🔧",
-            "App Configuration",
-            "General settings and maintenance options",
-            purple
-        )
-
-        // Security
-        addSection("Security & Reports", "CONTROL")
-
-        addOption(
-            "🔐",
-            "Security Settings",
-            "Security configuration and access review",
-            pink
-        )
-
-        addOption(
-            "📊",
-            "Reports & Activity",
-            "Reports and activity review options",
-            cyan
-        )
-
-        addOption(
-            "💾",
-            "Backup & Data",
-            "Backup configuration information",
-            gold
-        )
-
-        // Footer
-        val footer = makeText(
-            "KINGDOM VOICE CHAT • OWNER PANEL",
-            10f, muted, true
-        ).apply {
+        val backButton = TextView(this).apply {
+            text = "←  BACK TO HOME"
+            textSize = 15f
             gravity = Gravity.CENTER
-            setPadding(0, dp(24), 0, dp(8))
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.BLACK)
+            setPadding(16, 16, 16, 16)
+            background = rounded(accentColor, 14)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                finish()
+            }
         }
 
-        content.addView(footer)
-        setContentView(scroll)
-    }
+        content.addView(backButton, marginParams(top = 14, bottom = 12))
 
-    private fun addSection(title: String, tag: String) {
-        val row = LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        row.addView(
-            makeText(title, 19f, white, true),
-            LinearLayout.LayoutParams(0, -2, 1f)
+        content.addView(
+            label(
+                "Kingdom Voice Chat • Owner Dashboard",
+                12,
+                mutedColor,
+                false
+            ).apply {
+                gravity = Gravity.CENTER
+                setPadding(8, 12, 8, 8)
+            }
         )
 
-        row.addView(makeText(tag, 9f, cyan, true))
+        scroll.addView(content)
+        root.addView(
+            scroll,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+        )
 
-        val params = LinearLayout.LayoutParams(-1, -2)
-        params.topMargin = dp(24)
-        params.bottomMargin = dp(12)
-
-        content.addView(row, params)
+        setContentView(root)
     }
 
     private fun statCard(
-        number: String,
-        label: String,
-        accent: Int
-    ): LinearLayout {
-        val box = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(8), dp(12), dp(8), dp(12))
-            background = gradient(intArrayOf(card, bg), 18)
-        }
-
-        box.addView(makeText(number, 25f, accent, true))
-
-        val labelText = makeText(label, 11f, muted, true)
-        labelText.gravity = Gravity.CENTER
-        labelText.setPadding(0, dp(5), 0, 0)
-        box.addView(labelText)
-
-        return box
-    }
-
-    private fun addOption(
-        icon: String,
         title: String,
-        subtitle: String,
-        accent: Int
-    ) {
-        val row = LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(14), dp(13), dp(12), dp(13))
-            background = gradient(intArrayOf(card, bg), 16)
-            isClickable = true
-            isFocusable = true
-        }
-
-        val iconView = makeText(icon, 24f, accent, true).apply {
-            gravity = Gravity.CENTER
-        }
-
-        row.addView(
-            iconView,
-            LinearLayout.LayoutParams(dp(42), dp(42))
-        )
-
-        val details = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(12), 0, dp(8), 0)
-            addView(makeText(title, 14f, white, true))
-            addView(makeText(subtitle, 11f, muted, false))
-        }
-
-        row.addView(
-            details,
-            LinearLayout.LayoutParams(0, -2, 1f)
-        )
-
-        row.addView(makeText("›", 27f, cyan, false))
-
-        row.setOnClickListener {
-            showOptionDetails(title, subtitle)
-        }
-
-        val params = LinearLayout.LayoutParams(-1, -2)
-        params.bottomMargin = dp(10)
-        content.addView(row, params)
-    }
-
-    private fun showOptionDetails(title: String, description: String) {
-        val extra = when (title) {
-            "Staff & Role Management" ->
-                "Role types include Official Employee, Complain Officer, " +
-                    "Salary Provider Officer, Manager, Super Admin, Admin, " +
-                    "Coin Seller, Merchant, BD and Agency Agent."
-
-            "Coins & Pearls" ->
-                "Your planned system uses 1,000 gift coins = 500 Pearls. " +
-                    "Live balances and transactions are not connected yet."
-
-            "Seller Management" ->
-                "The planned seller workflow includes coin sales, Pearl exchange " +
-                    "and authorized approval. No live transactions are processed here."
-
-            "Voice Room Settings" ->
-                "Room configuration is currently a demo. Changes are not applied " +
-                    "to active rooms."
-
-            "Security Settings" ->
-                "Real access control must be enforced by a trusted backend. " +
-                    "This screen alone cannot secure Owner permissions."
-
-            "Backup & Data" ->
-                "Automated server backups are not connected yet."
-
-            "Complaints & Hearings" ->
-                "Complaint records and hearing decisions are not connected to a database yet."
-
-            "Reports & Activity" ->
-                "Live user, wallet and staff reports are not available yet."
-
-            else ->
-                "This section is part of the Owner Panel interface. " +
-                    "Database and server integration is still required."
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle(title)
-            .setMessage("$description\n\n$extra")
-            .setPositiveButton("OK", null)
-            .show()
-    }
-
-    private fun makeText(
         value: String,
-        size: Float,
+        subtitle: String
+    ): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(8, 12, 8, 12)
+            background = rounded(cardColor, 14)
+
+            addView(label(title, 11, accentColor, true))
+            addView(label(value, 25, textColor, true))
+            addView(label(subtitle, 10, mutedColor, false))
+        }
+    }
+
+    private fun sectionTitle(title: String): TextView {
+        return label(title, 14, accentColor, true).apply {
+            setPadding(2, 8, 2, 12)
+        }
+    }
+
+    private fun label(
+        value: String,
+        size: Int,
         color: Int,
         bold: Boolean
     ): TextView {
         return TextView(this).apply {
             text = value
-            textSize = size
+            textSize = size.toFloat()
             setTextColor(color)
-            if (bold) typeface = Typeface.DEFAULT_BOLD
+            if (bold) {
+                typeface = Typeface.DEFAULT_BOLD
+            }
+            gravity = Gravity.CENTER_VERTICAL
         }
     }
 
-    private fun gradient(
-        colors: IntArray,
-        radius: Int
-    ): GradientDrawable {
-        return GradientDrawable(
-            GradientDrawable.Orientation.TL_BR,
-            colors
+    private fun showFeatureDialog(title: String, description: String) {
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(
+                "$description\n\n" +
+                    "This section is currently a demo. " +
+                    "Database integration and secure owner permissions " +
+                    "must be implemented before it can perform real actions."
+            )
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
+    private fun rounded(color: Int, radiusDp: Int): GradientDrawable {
+        return GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(radiusDp).toFloat()
+        }
+    }
+
+    private fun marginParams(
+        top: Int = 0,
+        bottom: Int = 0
+    ): LinearLayout.LayoutParams {
+        return LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply {
-            cornerRadius = dp(radius).toFloat()
+            topMargin = dp(top)
+            bottomMargin = dp(bottom)
         }
     }
 
-    private fun dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
+    private fun dp(value: Int): Int {
+        return (value * resources.displayMetrics.density).toInt()
+    }
 }
