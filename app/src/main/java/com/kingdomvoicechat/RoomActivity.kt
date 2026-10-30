@@ -17,7 +17,8 @@ class RoomActivity : AppCompatActivity() {
 
     companion object {
         private const val APP_ID = 976076264L
-        private const val APP_SIGN = "PASTE_YOUR_ZEGO_APPSIGN_HERE"
+        private val appSign: String
+    get() = BuildConfig.ZEGO_APP_SIGN
         private const val MIC_PERMISSION = 1001
     }
 
