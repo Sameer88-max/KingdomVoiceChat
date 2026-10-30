@@ -5,17 +5,9 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-val localProps = java.util.Properties().apply {
-    val propsFile = rootProject.file("local.properties")
-    if (propsFile.exists()) {
-        propsFile.inputStream().use { load(it) }
-    }
-}
-
-val zegoAppSign = providers.gradleProperty("ZEGO_APP_SIGN").orNull
-    ?: System.getenv("ZEGO_APP_SIGN")
-    ?: localProps.getProperty("ZEGO_APP_SIGN")
-    ?: ""
+val zegoAppSign = providers.gradleProperty("ZEGO_APP_SIGN")
+    .orElse(providers.environmentVariable("ZEGO_APP_SIGN"))
+    .getOrElse("")
 
 android {
     namespace = "com.kingdomvoicechat"
@@ -62,6 +54,5 @@ dependencies {
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
 
-    // ZEGOCLOUD Live Audio Room
     implementation("im.zego:zego_uikit_prebuilt_live_audio_room_android:+")
 }
