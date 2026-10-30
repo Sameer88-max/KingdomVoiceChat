@@ -1,3 +1,4 @@
+
 package com.kingdomvoicechat
 
 import android.Manifest
@@ -17,10 +18,12 @@ class RoomActivity : AppCompatActivity() {
 
     companion object {
         private const val APP_ID = 976076264L
-        private val appSign: String
-    get() = BuildConfig.ZEGO_APP_SIGN
         private const val MIC_PERMISSION = 1001
     }
+
+    // AppSign Gradle BuildConfig se load hoga
+    private val appSign: String
+        get() = BuildConfig.ZEGO_APP_SIGN
 
     private var roomStarted = false
     private lateinit var roomContainer: FrameLayout
@@ -34,7 +37,7 @@ class RoomActivity : AppCompatActivity() {
 
         setContentView(roomContainer)
 
-        if (APP_SIGN == "PASTE_YOUR_ZEGO_APPSIGN_HERE") {
+        if (appSign.isBlank()) {
             Toast.makeText(
                 this,
                 "ZEGOCLOUD AppSign is required",
@@ -117,7 +120,7 @@ class RoomActivity : AppCompatActivity() {
         val fragment =
             ZegoUIKitPrebuiltLiveAudioRoomFragment.newInstance(
                 APP_ID,
-                APP_SIGN,
+                appSign,
                 userID,
                 userName,
                 roomID,
