@@ -1,8 +1,21 @@
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.gms.google-services")
 }
+
+val localProps = java.util.Properties().apply {
+    val propsFile = rootProject.file("local.properties")
+    if (propsFile.exists()) {
+        propsFile.inputStream().use { load(it) }
+    }
+}
+
+val zegoAppSign = providers.gradleProperty("ZEGO_APP_SIGN").orNull
+    ?: System.getenv("ZEGO_APP_SIGN")
+    ?: localProps.getProperty("ZEGO_APP_SIGN")
+    ?: ""
 
 android {
     namespace = "com.kingdomvoicechat"
@@ -14,6 +27,16 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+
+        buildConfigField(
+            "String",
+            "ZEGO_APP_SIGN",
+            "\"${zegoAppSign.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+        )
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
