@@ -3,18 +3,22 @@ package com.kingdomvoicechat
 
 import android.app.Activity
 import android.app.AlertDialog
-import android.os.Bundle
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
+import android.os.Bundle
 import android.view.Gravity
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
 
 class MainActivity : Activity() {
 
@@ -27,8 +31,22 @@ class MainActivity : Activity() {
     private val pink = Color.rgb(255, 105, 175)
     private val gold = Color.rgb(255, 190, 86)
 
-    private lateinit var page: LinearLayout
+    private val auth by lazy { FirebaseAuth.getInstance() }
+    private val db by lazy { FirebaseFirestore.getInstance() }
+
     private var currentFeature: String? = null
+    private var selectedPhoto: Uri? = null
+
+    private lateinit var profileName: EditText
+    private lateinit var profileCountry: EditText
+    private lateinit var profileAge: EditText
+    private lateinit var profileGender: TextView
+    private lateinit var profileImage: ImageView
+    private lateinit var profileStatus: TextView
+
+    private val photoPrefs by lazy {
+        getSharedPreferences("kvc_profile", MODE_PRIVATE)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,7 +70,7 @@ class MainActivity : Activity() {
         scroll.setBackgroundColor(bg)
         scroll.isFillViewport = true
 
-        page = LinearLayout(this).apply {
+        val page = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(20), dp(18), dp(24))
         }
@@ -106,25 +124,30 @@ class MainActivity : Activity() {
             openRooms()
         }
 
-        val exploreParams = LinearLayout.LayoutParams(-1, dp(85))
-        exploreParams.topMargin = dp(18)
-        hero.addView(explore, exploreParams)
+        hero.addView(
+            explore,
+            LinearLayout.LayoutParams(-1, dp(85)).apply {
+                topMargin = dp(18)
+            }
+        )
 
-        val heroParams = LinearLayout.LayoutParams(-1, -2)
-        heroParams.topMargin = dp(22)
-        page.addView(hero, heroParams)
+        page.addView(
+            hero,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(22)
+            }
+        )
 
         val ownerPanel = tile("👑", "OWNER PANEL", gold) {
-            try {
-                startActivity(Intent(this, OwnerPanelActivity::class.java))
-            } catch (e: Exception) {
-                notice("Owner Panel screen could not be opened.")
-            }
+            openOwnerPanel()
         }
 
-        val ownerParams = LinearLayout.LayoutParams(-1, dp(85))
-        ownerParams.topMargin = dp(18)
-        page.addView(ownerPanel, ownerParams)
+        page.addView(
+            ownerPanel,
+            LinearLayout.LayoutParams(-1, dp(85)).apply {
+                topMargin = dp(18)
+            }
+        )
 
         section(page, "Your Space", "QUICK ACCESS")
 
@@ -164,7 +187,399 @@ class MainActivity : Activity() {
         setContentView(scroll)
     }
 
+    private fun showProfile() {
+        currentFeature = "My Profile"
+
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(bg)
+            isFillViewport = true
+        }
+
+        val screen = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(22), dp(20), dp(30))
+        }
+
+        scroll.addView(screen)
+
+        screen.addView(
+            tile("‹", "BACK TO HOME", cyan) { showHome() },
+            LinearLayout.LayoutParams(-1, dp(60))
+        )
+
+        val title = text("MY PROFILE", 27f, white, true)
+        title.setPadding(0, dp(24), 0, dp(6))
+        screen.addView(title)
+
+        screen.addView(text("YOUR KINGDOM IDENTITY", 11f, cyan, true))
+
+        val photoBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(18), dp(20), dp(18), dp(20))
+            background = gradient(intArrayOf(card, bg), 20)
+        }
+
+        profileImage = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.rgb(45, 51, 90))
+                setStroke(dp(2), cyan)
+            }
+            clipToOutline = true
+            setImageResource(android.R.drawable.ic_menu_camera)
+        }
+
+        photoBox.addView(
+            profileImage,
+            LinearLayout.LayoutParams(dp(112), dp(112))
+        )
+
+        val photoButton = tile("📷", "CHOOSE PROFILE PHOTO", cyan) {
+            choosePhoto()
+        }
+
+        photoBox.addView(
+            photoButton,
+            LinearLayout.LayoutParams(-1, dp(65)).apply {
+                topMargin = dp(14)
+            }
+        )
+
+        screen.addView(
+            photoBox,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(18)
+            }
+        )
+
+        val user = auth.currentUser
+
+        val idCard = infoCard("USER ID", user?.uid ?: "Not signed in")
+        screen.addView(
+            idCard,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(14)
+            }
+        )
+
+        val levelCard = infoCard("LEVEL", "Not connected yet")
+        screen.addView(
+            levelCard,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(10)
+            }
+        )
+
+        section(screen, "Personal Information", "EDIT DETAILS")
+
+        profileName = inputField("Profile name")
+        profileCountry = inputField("Country")
+        profileAge = inputField("Age")
+        profileGender = text("Select gender  ›", 15f, white, true).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), 0, dp(14), 0)
+            background = fieldBackground()
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { chooseGender() }
+        }
+
+        addLabeledField(screen, "PROFILE NAME", profileName)
+        addLabeledField(screen, "COUNTRY", profileCountry)
+        addLabeledField(screen, "AGE", profileAge)
+        addLabeledView(screen, "GENDER", profileGender)
+
+        val save = tile("✓", "SAVE PROFILE", cyan) {
+            saveProfile()
+        }
+
+        screen.addView(
+            save,
+            LinearLayout.LayoutParams(-1, dp(65)).apply {
+                topMargin = dp(20)
+            }
+        )
+
+        profileStatus = text("", 12f, muted, false)
+        profileStatus.setPadding(0, dp(12), 0, dp(4))
+        screen.addView(profileStatus)
+
+        section(screen, "Account Services", "MORE")
+
+        addRow(screen, "💰", "Coins Balance",
+            "Wallet integration pending", gold)
+        addRow(screen, "💎", "Pearls Balance",
+            "Secure rewards integration pending", cyan)
+        addRow(screen, "👑", "VIP & Noble",
+            "Membership information", gold)
+        addRow(screen, "🎧", "Customer Service",
+            "Help and support", purple)
+        addRow(screen, "⚙", "Settings",
+            "Privacy and preferences", cyan)
+        addRow(screen, "📨", "Agency Apply",
+            "Agency application information", purple)
+        addRow(screen, "🎁", "Reward",
+            "Reward system integration pending", pink)
+        addRow(screen, "✉", "Invitation",
+            "Invitation feature pending", cyan)
+
+        setContentView(scroll)
+        loadProfile()
+        loadLocalPhoto()
+    }
+
+    private fun loadProfile() {
+        val user = auth.currentUser
+        if (user == null) {
+            notice("Please log in first.")
+            return
+        }
+
+        profileStatus.text = "Loading profile..."
+
+        db.collection("users")
+            .document(user.uid)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    profileName.setText(
+                        document.getString("name") ?: ""
+                    )
+                    profileCountry.setText(
+                        document.getString("country") ?: ""
+                    )
+                    profileAge.setText(
+                        document.getString("age") ?: ""
+                    )
+
+                    val gender = document.getString("gender") ?: ""
+                    profileGender.text =
+                        if (gender.isBlank()) "Select gender  ›"
+                        else "$gender  ›"
+
+                    profileStatus.text = "Profile loaded successfully."
+                } else {
+                    profileName.setText(
+                        user.email?.substringBefore("@") ?: ""
+                    )
+                    profileStatus.text =
+                        "Complete your details and press SAVE PROFILE."
+                }
+            }
+            .addOnFailureListener { error ->
+                profileStatus.text =
+                    "Could not load profile: ${error.localizedMessage}"
+            }
+    }
+
+    private fun saveProfile() {
+        val user = auth.currentUser
+        if (user == null) {
+            notice("Please log in first.")
+            return
+        }
+
+        val name = profileName.text.toString().trim()
+        val country = profileCountry.text.toString().trim()
+        val age = profileAge.text.toString().trim()
+        val gender = profileGender.text.toString()
+            .removeSuffix("  ›").trim()
+
+        if (name.isBlank()) {
+            notice("Profile name enter karein.")
+            return
+        }
+
+        if (age.isNotBlank() && age.toIntOrNull() == null) {
+            notice("Age mein sirf numbers enter karein.")
+            return
+        }
+
+        if (age.isNotBlank() && age.toInt() !in 1..120) {
+            notice("Age 1 se 120 ke darmiyan enter karein.")
+            return
+        }
+
+        if (gender == "Select gender" || gender.isBlank()) {
+            notice("Gender select karein.")
+            return
+        }
+
+        profileStatus.text = "Saving profile..."
+
+        val data = hashMapOf<String, Any>(
+            "name" to name,
+            "country" to country,
+            "age" to age,
+            "gender" to gender,
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+
+        db.collection("users")
+            .document(user.uid)
+            .set(data, com.google.firebase.firestore.SetOptions.merge())
+            .addOnSuccessListener {
+                profileStatus.text = "Profile saved successfully."
+                notice("Profile save ho gaya.")
+            }
+            .addOnFailureListener { error ->
+                profileStatus.text =
+                    "Save failed: ${error.localizedMessage}"
+                notice("Profile save nahi ho saka.")
+            }
+    }
+
+    private fun chooseGender() {
+        val choices = arrayOf("Male", "Female", "Prefer not to say")
+
+        AlertDialog.Builder(this)
+            .setTitle("Select Gender")
+            .setItems(choices) { _, which ->
+                profileGender.text = choices[which] + "  ›"
+            }
+            .setNegativeButton("CANCEL", null)
+            .show()
+    }
+
+    private fun choosePhoto() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "image/*"
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+            )
+        }
+
+        try {
+            startActivityForResult(intent, 501)
+        } catch (e: Exception) {
+            notice("Photo picker open nahi ho saka.")
+        }
+    }
+
+    @Deprecated("Legacy activity result API for compatibility")
+    override fun onActivityResult(
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?
+    ) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (requestCode == 501 && resultCode == RESULT_OK) {
+            val uri = data?.data ?: return
+
+            try {
+                contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: Exception) {
+                // Some photo providers do not offer persistent access.
+            }
+
+            selectedPhoto = uri
+            photoPrefs.edit().putString("photo_uri", uri.toString()).apply()
+            showPhoto(uri)
+            notice("Profile photo selected on this device.")
+        }
+    }
+
+    private fun loadLocalPhoto() {
+        val saved = photoPrefs.getString("photo_uri", null) ?: return
+        try {
+            showPhoto(Uri.parse(saved))
+        } catch (_: Exception) {
+            photoPrefs.edit().remove("photo_uri").apply()
+        }
+    }
+
+    private fun showPhoto(uri: Uri) {
+        try {
+            profileImage.setImageURI(uri)
+        } catch (_: Exception) {
+            notice("Photo display nahi ho saki.")
+        }
+    }
+
+    private fun infoCard(label: String, value: String): LinearLayout {
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(15), dp(13), dp(15), dp(13))
+            background = gradient(intArrayOf(card, bg), 15)
+        }
+        box.addView(text(label, 10f, cyan, true))
+        box.addView(
+            text(value, 12f, white, false).apply {
+                setPadding(0, dp(6), 0, 0)
+            }
+        )
+        return box
+    }
+
+    private fun inputField(hintText: String): EditText {
+        return EditText(this).apply {
+            hint = hintText
+            setHintTextColor(muted)
+            setTextColor(white)
+            textSize = 15f
+            singleLine = true
+            setPadding(dp(14), dp(8), dp(14), dp(8))
+            background = fieldBackground()
+        }
+    }
+
+    private fun fieldBackground(): GradientDrawable {
+        return GradientDrawable().apply {
+            setColor(Color.rgb(17, 21, 48))
+            cornerRadius = dp(12).toFloat()
+            setStroke(dp(1), Color.rgb(75, 83, 135))
+        }
+    }
+
+    private fun addLabeledField(
+        target: LinearLayout,
+        label: String,
+        field: EditText
+    ) {
+        addLabeledView(target, label, field)
+    }
+
+    private fun addLabeledView(
+        target: LinearLayout,
+        label: String,
+        view: android.view.View
+    ) {
+        val group = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        group.addView(text(label, 10f, cyan, true))
+        group.addView(
+            view,
+            LinearLayout.LayoutParams(-1, dp(54)).apply {
+                topMargin = dp(7)
+            }
+        )
+
+        target.addView(
+            group,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(12)
+            }
+        )
+    }
+
     private fun showFeature(name: String) {
+        if (name == "My Profile" ||
+            name == "Profile & DP" ||
+            name == "Country, Age & Gender"
+        ) {
+            showProfile()
+            return
+        }
+
         currentFeature = name
 
         val scroll = ScrollView(this)
@@ -178,17 +593,30 @@ class MainActivity : Activity() {
 
         scroll.addView(screen)
 
-        val back = tile("‹", "BACK TO HOME", cyan) {
-            showHome()
-        }
-
-        screen.addView(back, LinearLayout.LayoutParams(-1, dp(62)))
+        screen.addView(
+            tile("‹", "BACK TO HOME", cyan) { showHome() },
+            LinearLayout.LayoutParams(-1, dp(62))
+        )
 
         val title = text(name, 27f, white, true)
         title.setPadding(0, dp(28), 0, dp(8))
         screen.addView(title)
-
         screen.addView(text("KINGDOM VOICE CHAT", 12f, cyan, true))
+
+        val description = when (name) {
+            "Sub Rooms" -> "Explore and manage sub-room options."
+            "Gifts" -> "Gift catalogue and secure gift sending will be connected here."
+            "Chat Messages" -> "Private messages and friend chat will be connected here."
+            "Wallet" -> "Coin balance, Pearls and transaction history will appear here."
+            "Followers" -> "Your followers and following lists will appear here."
+            "Levels" -> "Your activity level and level progress will appear here."
+            "Update Password" -> "Use the secure password update process for your account."
+            "Settings" -> "Privacy, notifications and app preferences."
+            "Help & Customer Contact" -> "Customer support and complaint submission."
+            "Notifications" -> "Your app notifications will appear here."
+            "Delete Account" -> "Account deletion requires identity checks and confirmation."
+            else -> "This section is ready for its next implementation phase."
+        }
 
         val info = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -196,88 +624,43 @@ class MainActivity : Activity() {
             background = gradient(intArrayOf(card, bg), 20)
         }
 
-        val description = when (name) {
-            "Sub Rooms" -> "Explore and manage sub-room options."
-            "Gifts" -> "Gift catalogue and gift sending will be connected to the secure wallet."
-            "Chat Messages" -> "Private text messages, conversation list and friend chat will be connected here."
-            "Wallet" -> "Your coin balance, Pearls, transaction history and seller requests will appear here."
-            "My Profile", "Profile & DP" -> "Your profile name, photo, user ID and account details will be managed here."
-            "Followers" -> "Your followers and following lists will appear here."
-            "Levels" -> "Your activity level and level progress will appear here."
-            "Country, Age & Gender" -> "Your profile information will be managed here."
-            "Update Password" -> "Use the secure password update process for your account."
-            "Settings" -> "Privacy, notifications and app preferences will be configured here."
-            "Help & Customer Contact" -> "Customer support and complaint submission will be connected here."
-            "Notifications" -> "Your app notifications will appear here."
-            "Delete Account" -> "Account deletion requires identity checks and explicit confirmation."
-            else -> "This section is ready for its next implementation phase."
-        }
-
         info.addView(text("FEATURE CENTRE", 12f, cyan, true))
-
-        val detail = text(description, 15f, white, false)
-        detail.setPadding(0, dp(12), 0, dp(12))
-        info.addView(detail)
-
         info.addView(
-            text(
-                "Status: Screen navigation ready. Feature/backend integration pending.",
-                12f, gold, false
-            )
+            text(description, 15f, white, false).apply {
+                setPadding(0, dp(12), 0, dp(12))
+            }
+        )
+        info.addView(
+            text("Status: Backend integration pending.", 12f, gold, false)
         )
 
-        val infoParams = LinearLayout.LayoutParams(-1, -2)
-        infoParams.topMargin = dp(22)
-        screen.addView(info, infoParams)
-
-        when (name) {
-            "My Profile", "Profile & DP" -> {
-                addFeatureButton(screen, "EDIT PROFILE") {
-                    notice("Profile editor is not connected yet.")
-                }
+        screen.addView(
+            info,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(22)
             }
+        )
 
-            "Update Password" -> {
-                addFeatureButton(screen, "UPDATE PASSWORD") {
-                    notice("Secure password update screen is next.")
-                }
-            }
-
-            "Help & Customer Contact" -> {
-                addFeatureButton(screen, "CONTACT SUPPORT") {
-                    notice("Customer support backend is not connected yet.")
-                }
-            }
-
-            "Delete Account" -> {
-                addFeatureButton(screen, "REQUEST ACCOUNT DELETION") {
+        if (name == "Delete Account") {
+            screen.addView(
+                tile("!", "ACCOUNT DELETION INFORMATION", pink) {
                     AlertDialog.Builder(this)
                         .setTitle("Delete account")
                         .setMessage(
                             "Account deletion is not enabled yet. No account has been deleted."
                         )
-                        .setNegativeButton("CANCEL", null)
                         .setPositiveButton("OK", null)
                         .show()
+                },
+                LinearLayout.LayoutParams(-1, dp(65)).apply {
+                    topMargin = dp(15)
                 }
-            }
+            )
         }
 
         setContentView(scroll)
     }
 
-    private fun addFeatureButton(
-        screen: LinearLayout,
-        label: String,
-        action: () -> Unit
-    ) {
-        val button = tile("›", label, cyan, action)
-        val params = LinearLayout.LayoutParams(-1, dp(70))
-        params.topMargin = dp(14)
-        screen.addView(button, params)
-    }
-
-    // CREATE ROOM / JOIN ROOM
     private fun openRooms() {
         val options = arrayOf("Create New Room", "Join Existing Room")
 
@@ -290,9 +673,7 @@ class MainActivity : Activity() {
 
                     AlertDialog.Builder(this)
                         .setTitle("Your Room ID")
-                        .setMessage(
-                            "Room ID: $roomID\nShare this ID with others."
-                        )
+                        .setMessage("Room ID: $roomID\nShare this ID with others.")
                         .setNegativeButton("CANCEL", null)
                         .setPositiveButton("CREATE ROOM") { _, _ ->
                             RoomManager.createRoom(this, roomID)
@@ -309,10 +690,7 @@ class MainActivity : Activity() {
                         .setView(input)
                         .setNegativeButton("CANCEL", null)
                         .setPositiveButton("JOIN") { _, _ ->
-                            RoomManager.joinRoom(
-                                this,
-                                input.text.toString()
-                            )
+                            RoomManager.joinRoom(this, input.text.toString())
                         }
                         .show()
                 }
@@ -321,18 +699,18 @@ class MainActivity : Activity() {
             .show()
     }
 
+    private fun openOwnerPanel() {
+        try {
+            startActivity(Intent(this, OwnerPanelActivity::class.java))
+        } catch (_: Exception) {
+            notice("Owner Panel screen could not be opened.")
+        }
+    }
+
     private fun openOption(name: String) {
         when (name) {
             "Voice Rooms" -> openRooms()
-
-            "Owner Panel" -> {
-                try {
-                    startActivity(Intent(this, OwnerPanelActivity::class.java))
-                } catch (e: Exception) {
-                    notice("Owner Panel screen could not be opened.")
-                }
-            }
-
+            "Owner Panel" -> openOwnerPanel()
             "Sign Out" -> confirmSignOut()
             else -> showFeature(name)
         }
@@ -341,22 +719,17 @@ class MainActivity : Activity() {
     private fun confirmSignOut() {
         AlertDialog.Builder(this)
             .setTitle("Sign out?")
-            .setMessage("Do you want to sign out of Kingdom Voice Chat on this device?")
+            .setMessage("Do you want to sign out of this device?")
             .setNegativeButton("CANCEL", null)
             .setPositiveButton("SIGN OUT") { _, _ ->
-                try {
-                    FirebaseAuth.getInstance().signOut()
-
-                    val intent = Intent(this, AuthActivity::class.java)
-                    intent.addFlags(
-                        Intent.FLAG_ACTIVITY_NEW_TASK or
-                            Intent.FLAG_ACTIVITY_CLEAR_TASK
-                    )
-                    startActivity(intent)
-                    finish()
-                } catch (e: Exception) {
-                    notice("Sign out failed. Please try again.")
-                }
+                auth.signOut()
+                val intent = Intent(this, AuthActivity::class.java)
+                intent.addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TASK
+                )
+                startActivity(intent)
+                finish()
             }
             .show()
     }
@@ -374,13 +747,15 @@ class MainActivity : Activity() {
             text(title, 19f, white, true),
             LinearLayout.LayoutParams(0, -2, 1f)
         )
-
         row.addView(text(tag, 9f, cyan, true))
 
-        val params = LinearLayout.LayoutParams(-1, -2)
-        params.topMargin = dp(24)
-        params.bottomMargin = dp(12)
-        target.addView(row, params)
+        target.addView(
+            row,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(24)
+                bottomMargin = dp(12)
+            }
+        )
     }
 
     private fun addGrid(
@@ -401,19 +776,21 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(0, dp(105), 1f)
         )
 
-        val rightParams = LinearLayout.LayoutParams(0, dp(105), 1f)
-        rightParams.leftMargin = dp(12)
-
         row.addView(
             tile(rightIcon, rightTitle, cyan) {
                 openOption(rightTitle)
             },
-            rightParams
+            LinearLayout.LayoutParams(0, dp(105), 1f).apply {
+                leftMargin = dp(12)
+            }
         )
 
-        val params = LinearLayout.LayoutParams(-1, -2)
-        params.bottomMargin = dp(12)
-        target.addView(row, params)
+        target.addView(
+            row,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(12)
+            }
+        )
     }
 
     private fun tile(
@@ -433,9 +810,11 @@ class MainActivity : Activity() {
 
         box.addView(text(icon, 24f, accent, true))
 
-        val name = text(title, 14f, white, true)
-        name.setPadding(0, dp(7), 0, 0)
-        box.addView(name)
+        box.addView(
+            text(title, 14f, white, true).apply {
+                setPadding(0, dp(7), 0, 0)
+            }
+        )
 
         box.setOnClickListener { action() }
         return box
@@ -469,12 +848,14 @@ class MainActivity : Activity() {
 
         row.addView(details, LinearLayout.LayoutParams(0, -2, 1f))
         row.addView(text("›", 27f, cyan, false))
-
         row.setOnClickListener { openOption(title) }
 
-        val params = LinearLayout.LayoutParams(-1, -2)
-        params.bottomMargin = dp(10)
-        target.addView(row, params)
+        target.addView(
+            row,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(10)
+            }
+        )
     }
 
     private fun text(
