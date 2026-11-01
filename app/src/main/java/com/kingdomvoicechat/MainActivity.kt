@@ -1,4 +1,3 @@
-
 package com.kingdomvoicechat
 
 import android.app.Activity
