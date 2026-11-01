@@ -1311,7 +1311,7 @@ class MainActivity : Activity() {
             setHintTextColor(muted)
             background = fieldBackground()
             setPadding(dp(14), dp(10), dp(14), dp(10))
-            singleLine = true
+            setSingleLine(true)
         }
     }
 
