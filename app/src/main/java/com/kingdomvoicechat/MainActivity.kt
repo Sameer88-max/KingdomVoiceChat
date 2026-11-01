@@ -524,7 +524,7 @@ class MainActivity : Activity() {
             setHintTextColor(muted)
             setTextColor(white)
             textSize = 15f
-            singleLine = true
+            isSingleLine = true
             setPadding(dp(14), dp(8), dp(14), dp(8))
             background = fieldBackground()
         }
