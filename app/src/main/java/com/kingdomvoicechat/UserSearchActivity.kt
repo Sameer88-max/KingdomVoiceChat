@@ -27,7 +27,6 @@ class UserSearchActivity : Activity() {
     private val white = Color.WHITE
     private val muted = Color.rgb(174, 181, 215)
     private val cyan = Color.rgb(69, 226, 235)
-    private val purple = Color.rgb(150, 102, 255)
 
     private lateinit var searchInput: EditText
     private lateinit var results: LinearLayout
@@ -76,10 +75,12 @@ class UserSearchActivity : Activity() {
         )
 
         val scroll = ScrollView(this)
+
         results = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(18), 0, dp(15))
         }
+
         scroll.addView(results)
 
         root.addView(
@@ -99,15 +100,15 @@ class UserSearchActivity : Activity() {
         }
 
         val myUid = auth.currentUser?.uid
+
         if (myUid == null) {
             toast("Please sign in first")
             return
         }
 
         results.removeAllViews()
-        results.addView(label("Searching...", muted))
+        results.addView(label("Searching...", 14f, muted))
 
-        // First check whether the entered value is a Firebase UID.
         db.collection("publicProfiles")
             .document(query)
             .get()
@@ -129,6 +130,7 @@ class UserSearchActivity : Activity() {
             .limit(1)
             .get()
             .addOnSuccessListener { snapshot ->
+
                 val document = snapshot.documents.firstOrNull()
 
                 if (document != null) {
@@ -137,6 +139,7 @@ class UserSearchActivity : Activity() {
                 }
 
                 val numericValue = number.toLongOrNull()
+
                 if (numericValue == null) {
                     showNotFound()
                     return@addOnSuccessListener
@@ -147,7 +150,9 @@ class UserSearchActivity : Activity() {
                     .limit(1)
                     .get()
                     .addOnSuccessListener { numericSnapshot ->
+
                         val found = numericSnapshot.documents.firstOrNull()
+
                         if (found == null) {
                             showNotFound()
                         } else {
@@ -169,7 +174,9 @@ class UserSearchActivity : Activity() {
     ) {
         if (uid == auth.currentUser?.uid) {
             results.removeAllViews()
-            results.addView(label("This is your own profile.", muted))
+            results.addView(
+                label("This is your own profile.", 14f, muted)
+            )
             return
         }
 
@@ -188,12 +195,16 @@ class UserSearchActivity : Activity() {
             isFocusable = true
         }
 
-        profileCard.addView(label("👤  $name", 19f, white, true))
+        profileCard.addView(
+            label("👤  $name", 19f, white, true)
+        )
+
         profileCard.addView(
             label("ID: $publicId", 13f, muted).apply {
                 setPadding(0, dp(7), 0, dp(5))
             }
         )
+
         profileCard.addView(
             label("VIEW PROFILE  ›", 12f, cyan, true)
         )
@@ -222,15 +233,24 @@ class UserSearchActivity : Activity() {
                 val country = document.getString("country")
                     ?: publicData["country"]?.toString().orEmpty()
 
-                val age = document.getLong("age")?.toString().orEmpty()
+                val age = document.get("age")?.toString().orEmpty()
                 val gender = document.getString("gender").orEmpty()
 
                 val profileDetails = buildString {
                     append("Name: $name\n")
                     append("User ID: $publicId\n")
-                    if (country.isNotBlank()) append("Country: $country\n")
-                    if (age.isNotBlank()) append("Age: $age\n")
-                    if (gender.isNotBlank()) append("Gender: $gender\n")
+
+                    if (country.isNotBlank()) {
+                        append("Country: $country\n")
+                    }
+
+                    if (age.isNotBlank()) {
+                        append("Age: $age\n")
+                    }
+
+                    if (gender.isNotBlank()) {
+                        append("Gender: $gender\n")
+                    }
                 }
 
                 checkFollowStatus(uid, name, profileDetails)
@@ -254,6 +274,7 @@ class UserSearchActivity : Activity() {
 
         followRef.get()
             .addOnSuccessListener { document ->
+
                 val following = document.exists()
 
                 AlertDialog.Builder(this)
@@ -262,6 +283,7 @@ class UserSearchActivity : Activity() {
                     .setPositiveButton(
                         if (following) "UNFOLLOW" else "FOLLOW"
                     ) { _, _ ->
+
                         if (following) {
                             followRef.delete()
                                 .addOnSuccessListener {
@@ -270,6 +292,7 @@ class UserSearchActivity : Activity() {
                                 .addOnFailureListener {
                                     toast("Unfollow failed: ${it.localizedMessage}")
                                 }
+
                         } else {
                             followRef.set(
                                 mapOf(
@@ -292,13 +315,20 @@ class UserSearchActivity : Activity() {
 
     private fun showNotFound() {
         results.removeAllViews()
-        results.addView(label("No user found with this ID.", 14f, muted))
+        results.addView(
+            label("No user found with this ID.", 14f, muted)
+        )
     }
 
     private fun showError(message: String?) {
         results.removeAllViews()
+
         results.addView(
-            label("Search failed: ${message ?: "Unknown error"}", 14f, muted)
+            label(
+                "Search failed: ${message ?: "Unknown error"}",
+                14f,
+                muted
+            )
         )
     }
 
@@ -312,7 +342,10 @@ class UserSearchActivity : Activity() {
             text = value
             textSize = size
             setTextColor(color)
-            if (bold) setTypeface(null, Typeface.BOLD)
+
+            if (bold) {
+                setTypeface(null, Typeface.BOLD)
+            }
         }
     }
 
@@ -343,7 +376,10 @@ class UserSearchActivity : Activity() {
         return GradientDrawable().apply {
             setColor(color)
             cornerRadius = dp(radius).toFloat()
-            if (stroke != null) setStroke(dp(1), stroke)
+
+            if (stroke != null) {
+                setStroke(dp(1), stroke)
+            }
         }
     }
 
