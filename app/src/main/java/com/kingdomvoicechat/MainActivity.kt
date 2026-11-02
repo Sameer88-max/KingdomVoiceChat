@@ -1,4 +1,3 @@
-
 package com.kingdomvoicechat
 
 import android.app.Activity
@@ -110,18 +109,13 @@ class MainActivity : Activity() {
         functions
             .getHttpsCallable("syncPublicProfile")
             .call(data)
-            .addOnSuccessListener { result ->
-
-                val response = result.data as? Map<*, *>
-                val numericId = response?.get("numericId")
-
+            .addOnSuccessListener {
                 callback?.invoke(
                     true,
-                    "Profile synced. Your ID: $numericId"
+                    "Profile synced successfully."
                 )
             }
             .addOnFailureListener { error ->
-
                 callback?.invoke(
                     false,
                     error.localizedMessage ?: "Profile sync failed"
