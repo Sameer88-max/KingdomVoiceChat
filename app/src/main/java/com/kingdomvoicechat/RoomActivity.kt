@@ -1,3 +1,4 @@
+// app/src/main/java/com/kingdomvoicechat/RoomActivity.kt
 
 package com.kingdomvoicechat
 
@@ -6,11 +7,14 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.zegocloud.uikit.prebuilt.liveaudioroom.ZegoUIKitPrebuiltLiveAudioRoomConfig
 import com.zegocloud.uikit.prebuilt.liveaudioroom.ZegoUIKitPrebuiltLiveAudioRoomFragment
 
@@ -21,35 +25,126 @@ class RoomActivity : AppCompatActivity() {
         private const val MIC_PERMISSION = 1001
     }
 
-    // AppSign Gradle BuildConfig se load hoga
     private val appSign: String
         get() = BuildConfig.ZEGO_APP_SIGN
 
-    private var roomStarted = false
+    private val db by lazy {
+        FirebaseFirestore.getInstance()
+    }
+
     private lateinit var roomContainer: FrameLayout
+
+    private var roomStarted = false
+    private var pendingRoomID = ""
+    private var pendingHost = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        KingdomTheme.applyTo(this)
+
         roomContainer = FrameLayout(this).apply {
             id = View.generateViewId()
+            setBackgroundColor(KingdomTheme.BACKGROUND)
         }
 
         setContentView(roomContainer)
 
         if (appSign.isBlank()) {
-            Toast.makeText(
-                this,
-                "ZEGOCLOUD AppSign is required",
-                Toast.LENGTH_LONG
-            ).show()
+            showError("ZEGOCLOUD AppSign is required")
             return
         }
 
-        checkMicrophonePermission()
+        val requestedRoomID =
+            intent.getStringExtra("roomID")?.trim().orEmpty()
+
+        if (requestedRoomID.isBlank()) {
+            showError("Room number is missing")
+            return
+        }
+
+        verifyRoomAccess(requestedRoomID)
     }
 
-    private fun checkMicrophonePermission() {
+    private fun verifyRoomAccess(roomID: String) {
+        val user = FirebaseAuth.getInstance().currentUser
+
+        if (user == null) {
+            showError("Please login first")
+            return
+        }
+
+        // Official rooms are created and managed through Owner Panel.
+        db.collection("officialRooms")
+            .document(roomID)
+            .get()
+            .addOnSuccessListener { officialDoc ->
+
+                if (officialDoc.exists()) {
+                    val active =
+                        officialDoc.getBoolean("isActive") ?: false
+
+                    if (!active) {
+                        showError("This official room is unavailable")
+                        return@addOnSuccessListener
+                    }
+
+                    // Official rooms are audience-only in this client.
+                    requestMicAndJoin(roomID, false)
+                    return@addOnSuccessListener
+                }
+
+                verifyPersonalRoom(roomID, user.uid)
+            }
+            .addOnFailureListener {
+                showError("Unable to verify room. Check your connection.")
+            }
+    }
+
+    private fun verifyPersonalRoom(roomID: String, uid: String) {
+        db.collection("rooms")
+            .document(roomID)
+            .get()
+            .addOnSuccessListener { document ->
+
+                if (!document.exists()) {
+                    showError("Room not found")
+                    return@addOnSuccessListener
+                }
+
+                val ownerUID =
+                    document.getString("ownerUid").orEmpty()
+
+                val status =
+                    document.getString("status") ?: "active"
+
+                val locked =
+                    document.getBoolean("isLocked") ?: false
+
+                if (status != "active") {
+                    showError("This room is unavailable")
+                    return@addOnSuccessListener
+                }
+
+                if (locked && ownerUID != uid) {
+                    showError("This room is locked")
+                    return@addOnSuccessListener
+                }
+
+                val isHost = ownerUID == uid
+
+                requestMicAndJoin(roomID, isHost)
+            }
+            .addOnFailureListener {
+                showError("Unable to load room details")
+            }
+    }
+
+    private fun requestMicAndJoin(roomID: String, isHost: Boolean) {
+        // Save these BEFORE requesting permission.
+        pendingRoomID = roomID
+        pendingHost = isHost
+
         if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.RECORD_AUDIO
@@ -77,41 +172,44 @@ class RoomActivity : AppCompatActivity() {
         )
 
         if (requestCode == MIC_PERMISSION) {
-            if (grantResults.isNotEmpty() &&
+            if (
+                grantResults.isNotEmpty() &&
                 grantResults[0] == PackageManager.PERMISSION_GRANTED
             ) {
                 joinVoiceRoom()
             } else {
-                Toast.makeText(
-                    this,
-                    "Microphone permission is required",
-                    Toast.LENGTH_LONG
-                ).show()
+                showError("Microphone permission is required")
             }
         }
     }
 
     private fun joinVoiceRoom() {
         if (roomStarted) return
+
+        if (pendingRoomID.isBlank()) {
+            showError("Room verification is incomplete")
+            return
+        }
+
         roomStarted = true
 
-        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        val firebaseUser =
+            FirebaseAuth.getInstance().currentUser
 
-        val userID = (
-            firebaseUser?.uid ?: "guest_${System.currentTimeMillis()}"
-        ).replace(Regex("[^A-Za-z0-9_]"), "_")
+        if (firebaseUser == null) {
+            roomStarted = false
+            showError("Please login first")
+            return
+        }
+
+        val userID = firebaseUser.uid
+            .replace(Regex("[^A-Za-z0-9_]"), "_")
 
         val userName = (
-            firebaseUser?.displayName ?: "Kingdom_User"
+            firebaseUser.displayName ?: "Kingdom_User"
         ).replace(Regex("[^A-Za-z0-9_]"), "_")
 
-        val roomID = (
-            intent.getStringExtra("roomID") ?: "KVC_1001"
-        ).replace(Regex("[^A-Za-z0-9_]"), "_")
-
-        val isHost = intent.getBooleanExtra("host", false)
-
-        val config = if (isHost) {
+        val config = if (pendingHost) {
             ZegoUIKitPrebuiltLiveAudioRoomConfig.host()
         } else {
             ZegoUIKitPrebuiltLiveAudioRoomConfig.audience()
@@ -123,12 +221,21 @@ class RoomActivity : AppCompatActivity() {
                 appSign,
                 userID,
                 userName,
-                roomID,
+                pendingRoomID,
                 config
             )
 
         supportFragmentManager.beginTransaction()
             .replace(roomContainer.id, fragment)
-            .commit()
+            .commitAllowingStateLoss()
+    }
+
+    private fun showError(message: String) {
+        Toast.makeText(
+            this,
+            message,
+            Toast.LENGTH_LONG
+        ).show()
+        finish()
     }
 }
