@@ -1,3 +1,4 @@
+
 package com.kingdomvoicechat
 
 import android.app.Activity
@@ -36,22 +37,20 @@ class MainActivity : Activity() {
     private val auth by lazy { FirebaseAuth.getInstance() }
     private val db by lazy { FirebaseFirestore.getInstance() }
 
+    private var currentTab = "Home"
     private var currentFeature: String? = null
-    private var selectedPhoto: Uri? = null
     private var selectedGender = ""
 
     private var chatListener: ListenerRegistration? = null
     private var chatScroll: ScrollView? = null
     private var chatMessagesBox: LinearLayout? = null
     private var activeChatId: String? = null
-    private var activeChatOtherName: String? = null
 
     private lateinit var profileName: EditText
     private lateinit var profileCountry: EditText
     private lateinit var profileAge: EditText
     private lateinit var profileGender: TextView
     private lateinit var profileImage: ImageView
-    private lateinit var profileStatus: TextView
 
     private val photoPrefs by lazy {
         getSharedPreferences("kvc_profile", MODE_PRIVATE)
@@ -59,12 +58,10 @@ class MainActivity : Activity() {
 
     companion object {
         private const val PHOTO_REQUEST = 501
-        private const val DEFAULT_ROOM_ID = "KVC_1001"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         window.statusBarColor = bg
         window.navigationBarColor = bg
 
@@ -84,11 +81,16 @@ class MainActivity : Activity() {
         activeChatId = null
 
         if (currentFeature != null) {
+            currentFeature = null
+            showTab(currentTab)
+        } else if (currentTab != "Home") {
             showHome()
         } else {
             super.onBackPressed()
         }
     }
+
+    // PUBLIC PROFILE
 
     private fun ensurePublicProfile() {
         val user = auth.currentUser ?: return
@@ -102,7 +104,7 @@ class MainActivity : Activity() {
 
                 val country = doc.getString("country") ?: ""
 
-                val publicData = hashMapOf<String, Any>(
+                val data = hashMapOf<String, Any>(
                     "name" to name,
                     "country" to country,
                     "updatedAt" to FieldValue.serverTimestamp()
@@ -110,36 +112,57 @@ class MainActivity : Activity() {
 
                 db.collection("publicProfiles")
                     .document(user.uid)
-                    .set(publicData)
+                    .set(data)
             }
     }
 
     private fun syncPublicProfile(name: String, country: String) {
-        val user = auth.currentUser ?: return
+        val uid = auth.currentUser?.uid ?: return
 
-        val data = hashMapOf<String, Any>(
-            "name" to name,
-            "country" to country,
-            "updatedAt" to FieldValue.serverTimestamp()
-        )
-
-        db.collection("publicProfiles")
-            .document(user.uid)
-            .set(data)
+        db.collection("publicProfiles").document(uid)
+            .set(
+                mapOf(
+                    "name" to name,
+                    "country" to country,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            )
             .addOnFailureListener {
-                notice("Public profile sync failed: ${it.localizedMessage}")
+                notice("Profile sync failed: ${it.localizedMessage}")
             }
     }
 
-    private fun showHome() {
+    // BOTTOM NAVIGATION
+
+    private fun showTab(tab: String) {
+        currentTab = tab
+        currentFeature = null
+
         chatListener?.remove()
         chatListener = null
         activeChatId = null
-        currentFeature = null
 
-        val scroll = ScrollView(this).apply {
+        when (tab) {
+            "Home" -> showHome()
+            "Rooms" -> showRoomsTab()
+            "Messages" -> showMessagesTab()
+            "Profile" -> showProfileTab()
+        }
+    }
+
+    private fun showHome() {
+        showTabContent("Home")
+    }
+
+    private fun showTabContent(tab: String) {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setBackgroundColor(bg)
+        }
+
+        val content = ScrollView(this).apply {
             isFillViewport = true
+            setBackgroundColor(bg)
         }
 
         val page = LinearLayout(this).apply {
@@ -147,20 +170,88 @@ class MainActivity : Activity() {
             setPadding(dp(18), dp(20), dp(18), dp(24))
         }
 
-        scroll.addView(page)
+        content.addView(page)
+        root.addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
 
+        when (tab) {
+            "Home" -> buildHome(page)
+            "Rooms" -> buildRooms(page)
+            "Messages" -> buildMessages(page)
+            "Profile" -> buildProfileMenu(page)
+        }
+
+        root.addView(bottomNavigation(tab))
+        setContentView(root)
+    }
+
+    private fun bottomNavigation(selected: String): LinearLayout {
+        val nav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(5), dp(8), dp(5), dp(8))
+            setBackgroundColor(Color.rgb(19, 22, 49))
+        }
+
+        val items = listOf(
+            Triple("⌂", "Home", "Home"),
+            Triple("🎙", "Rooms", "Rooms"),
+            Triple("✉", "Messages", "Messages"),
+            Triple("♙", "Profile", "Profile")
+        )
+
+        items.forEach { item ->
+            val active = selected == item.second
+
+            val box = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setPadding(dp(4), dp(5), dp(4), dp(5))
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    showTab(item.second)
+                }
+            }
+
+            box.addView(
+                text(
+                    item.first,
+                    23f,
+                    if (active) cyan else muted,
+                    true
+                )
+            )
+
+            box.addView(
+                text(
+                    item.third,
+                    11f,
+                    if (active) cyan else muted,
+                    active
+                )
+            )
+
+            nav.addView(
+                box,
+                LinearLayout.LayoutParams(0, dp(55), 1f)
+            )
+        }
+
+        return nav
+    }
+
+    // HOME
+
+    private fun buildHome(page: LinearLayout) {
         val header = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
         }
 
-        val logo = text("♛", 30f, cyan, true).apply {
-            gravity = Gravity.CENTER
-        }
-
-        header.addView(logo, LinearLayout.LayoutParams(dp(48), dp(48)))
+        header.addView(text("♛", 32f, cyan, true))
 
         val brand = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), 0, 0, 0)
             addView(text("KINGDOM", 22f, white, true))
             addView(text("VOICE • CHAT • CONNECT", 10f, cyan, true))
         }
@@ -169,9 +260,8 @@ class MainActivity : Activity() {
 
         val bell = text("🔔", 23f, white, false)
         bell.setOnClickListener {
-            showFeature("Notifications")
+            showSimpleScreen("Notifications", "Your notifications will appear here.")
         }
-
         header.addView(bell)
         page.addView(header)
 
@@ -189,9 +279,11 @@ class MainActivity : Activity() {
 
         hero.addView(text("YOUR WORLD. YOUR VOICE.", 11f, cyan, true))
 
-        val heading = text("Find your people.", 29f, white, true)
-        heading.setPadding(0, dp(12), 0, dp(8))
-        hero.addView(heading)
+        hero.addView(
+            text("Find your people.", 29f, white, true).apply {
+                setPadding(0, dp(12), 0, dp(8))
+            }
+        )
 
         hero.addView(
             text(
@@ -204,9 +296,9 @@ class MainActivity : Activity() {
 
         hero.addView(
             tile("🎙", "Explore Voice Rooms", cyan) {
-                openRooms()
+                showTab("Rooms")
             },
-            LinearLayout.LayoutParams(-1, dp(85)).apply {
+            LinearLayout.LayoutParams(-1, dp(78)).apply {
                 topMargin = dp(18)
             }
         )
@@ -218,102 +310,276 @@ class MainActivity : Activity() {
             }
         )
 
-        page.addView(
-            tile("👑", "OWNER PANEL", gold) {
-                openOwnerPanel()
-            },
-            LinearLayout.LayoutParams(-1, dp(85)).apply {
-                topMargin = dp(18)
-            }
-        )
+        section(page, "Discover Kingdom", "EXPLORE")
 
-        section(page, "Your Space", "QUICK ACCESS")
+        addRow(
+            page, "🎙", "Voice Rooms",
+            "Explore official and normal rooms", cyan
+        ) {
+            showTab("Rooms")
+        }
 
-        addGrid(page, "🎙", "Voice Rooms", "🏠", "Sub Rooms")
-        addGrid(page, "🎁", "Gifts", "💬", "Chat Messages")
-        addGrid(page, "💎", "Wallet", "👤", "My Profile")
-        addGrid(page, "👥", "Followers", "⭐", "Levels")
+        addRow(
+            page, "📢", "Official Announcements",
+            "News and event announcements", purple
+        ) {
+            showSimpleScreen(
+                "Official Announcements",
+                "Official announcements will appear here."
+            )
+        }
 
-        section(page, "My Account", "SETTINGS")
+        addRow(
+            page, "⭐", "Featured Rooms",
+            "Discover featured voice rooms", gold
+        ) {
+            showTab("Rooms")
+        }
 
-        addRow(page, "🖼", "Profile & DP",
-            "Name, photo and user details", purple)
-
-        addRow(page, "🌍", "Country, Age & Gender",
-            "Manage profile information", cyan)
-
-        addRow(page, "🔐", "Update Password",
-            "Account security", gold)
-
-        addRow(page, "⚙", "Settings",
-            "Privacy and preferences", purple)
-
-        addRow(page, "❓", "Help & Customer Contact",
-            "Support and assistance", cyan)
-
-        addRow(page, "🚪", "Sign Out",
-            "Sign out of this device", pink)
-
-        addRow(page, "🗑", "Delete Account",
-            "Request account deletion", pink)
-
-        val footer = text("KINGDOM VOICE CHAT", 10f, muted, true)
+        val footer = text("KINGDOM VOICE CHAT APP", 10f, muted, true)
         footer.gravity = Gravity.CENTER
         footer.setPadding(0, dp(24), 0, dp(4))
         page.addView(footer)
+    }
 
-        setContentView(scroll)
+    // ROOMS
+
+    private fun buildRooms(page: LinearLayout) {
+        page.addView(text("Explore Rooms", 25f, white, true))
+        page.addView(
+            text(
+                "Find your favourite voice room.",
+                13f,
+                muted,
+                false
+            )
+        )
+
+        section(page, "Room Categories", "DISCOVER")
+
+        addRow(page, "👑", "Official Rooms",
+            "Official Kingdom voice rooms", gold) {
+            openRooms()
+        }
+
+        addRow(page, "🎙", "Normal Rooms",
+            "Explore public voice rooms", cyan) {
+            openRooms()
+        }
+
+        addRow(page, "🏠", "Sub Rooms",
+            "Explore available sub rooms", purple) {
+            openRooms()
+        }
+
+        page.addView(
+            button("OPEN VOICE ROOMS") {
+                openRooms()
+            },
+            LinearLayout.LayoutParams(-1, dp(52)).apply {
+                topMargin = dp(15)
+            }
+        )
+    }
+
+    private fun showRoomsTab() {
+        showTabContent("Rooms")
     }
 
     private fun openRooms() {
         try {
             startActivity(Intent(this, RoomActivity::class.java))
         } catch (e: Exception) {
-            notice("Voice rooms could not open: ${e.localizedMessage}")
+            notice("Rooms could not open: ${e.localizedMessage}")
         }
     }
 
-    private fun openOwnerPanel() {
-        try {
-            startActivity(Intent(this, OwnerPanelActivity::class.java))
-        } catch (e: Exception) {
-            notice("Owner panel could not open: ${e.localizedMessage}")
+    // MESSAGES
+
+    private fun buildMessages(page: LinearLayout) {
+        page.addView(text("Messages", 25f, white, true))
+        page.addView(
+            text("Private conversations with mutual followers.",
+                13f, muted, false)
+        )
+
+        addRow(page, "💬", "Conversations",
+            "Open your private chats", cyan) {
+            showPeople(true)
         }
+
+        addRow(page, "👥", "Message Contacts",
+            "Users you both follow", purple) {
+            showPeople(true)
+        }
+
+        addRow(page, "📩", "Message Requests",
+            "Your message requests", gold) {
+            showSimpleScreen(
+                "Message Requests",
+                "Message requests are not connected yet."
+            )
+        }
+
+        val list = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        section(page, "Available Contacts", "MUTUAL FOLLOWERS")
+        page.addView(list)
+
+        loadMutualContacts(list)
     }
 
-    private fun showFeature(feature: String) {
-        currentFeature = feature
+    private fun showMessagesTab() {
+        showTabContent("Messages")
+    }
 
-        when (feature) {
-            "Voice Rooms", "Sub Rooms" -> openRooms()
-            "Gifts" -> showGifts()
-            "Wallet" -> showWallet()
+    private fun loadMutualContacts(list: LinearLayout) {
+        val myUid = auth.currentUser?.uid ?: return
 
-            "My Profile", "Profile & DP",
-            "Country, Age & Gender" -> showProfile()
+        db.collection("publicProfiles")
+            .get()
+            .addOnSuccessListener { result ->
+                list.removeAllViews()
 
-            "Followers" -> showPeople(false)
-            "Chat Messages" -> showPeople(true)
+                result.documents.forEach { doc ->
+                    val otherUid = doc.id
+                    if (otherUid == myUid) return@forEach
 
-            "Update Password" -> showPasswordScreen()
+                    db.collection("follows")
+                        .document(myUid)
+                        .collection("following")
+                        .document(otherUid)
+                        .get()
+                        .addOnSuccessListener first@{ mine ->
+                            if (!mine.exists()) return@first
 
-            "Sign Out" -> confirmSignOut()
-            "Delete Account" -> confirmDeleteAccount()
+                            db.collection("follows")
+                                .document(otherUid)
+                                .collection("following")
+                                .document(myUid)
+                                .get()
+                                .addOnSuccessListener second@{ theirs ->
+                                    if (!theirs.exists()) return@second
 
-            else -> {
-                val screen = page(feature)
-                screen.addView(
-                    infoCard(
-                        feature,
-                        "This feature is not connected yet."
-                    ),
-                    LinearLayout.LayoutParams(-1, -2).apply {
-                        topMargin = dp(18)
-                    }
-                )
-                setContentView(screen)
+                                    val name = doc.getString("name") ?: "User"
+
+                                    list.addView(
+                                        tile("👤", name, cyan) {
+                                            openChat(otherUid, name)
+                                        },
+                                        LinearLayout.LayoutParams(-1, dp(65)).apply {
+                                            bottomMargin = dp(8)
+                                        }
+                                    )
+                                }
+                        }
+                }
+
+                if (result.isEmpty) {
+                    list.addView(
+                        text("No users found yet.", 14f, muted, false)
+                    )
+                }
             }
+            .addOnFailureListener {
+                notice("Could not load contacts: ${it.localizedMessage}")
+            }
+    }
+
+    // PROFILE MENU
+
+    private fun buildProfileMenu(page: LinearLayout) {
+        page.addView(text("My Account", 25f, white, true))
+
+        val user = auth.currentUser
+        val email = user?.email ?: "Not signed in"
+
+        page.addView(
+            infoCard("SIGNED-IN ACCOUNT", email),
+            LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(15)
+            }
+        )
+
+        section(page, "Personal Profile", "MY ACCOUNT")
+
+        addRow(page, "👤", "My Profile",
+            "Edit name, photo and personal details", cyan) {
+            showProfile()
         }
+
+        addRow(page, "🪙", "Wallet",
+            "Coins and Pearls balance", gold) {
+            showWallet()
+        }
+
+        addRow(page, "👥", "Followers",
+            "Discover users and manage following", purple) {
+            showPeople(false)
+        }
+
+        addRow(page, "🔎", "Search User",
+            "Find a user by ID", cyan) {
+            showSimpleScreen(
+                "Search User",
+                "User search screen is not connected yet."
+            )
+        }
+
+        addRow(page, "🎁", "Gifts Received",
+            "View gifts received from other users", pink) {
+            showSimpleScreen(
+                "Gifts Received",
+                "Received gifts history is not connected yet."
+            )
+        }
+
+        addRow(page, "⭐", "Levels",
+            "Your account level and progress", gold) {
+            showSimpleScreen(
+                "Levels",
+                "Level information is not connected yet."
+            )
+        }
+
+        section(page, "Account & Privacy", "SETTINGS")
+
+        addRow(page, "📜", "Privacy Policy",
+            "Read Kingdom Voice Chat privacy policy", cyan) {
+            showSimpleScreen(
+                "Privacy Policy",
+                "Add your approved privacy policy text here before publishing."
+            )
+        }
+
+        addRow(page, "⚙", "Account Settings",
+            "Password and account preferences", purple) {
+            showAccountSettings()
+        }
+
+        addRow(page, "❓", "Help & Customer Contact",
+            "Support and assistance", cyan) {
+            showSimpleScreen(
+                "Help & Customer Contact",
+                "Customer support details will appear here."
+            )
+        }
+
+        addRow(page, "🚪", "Sign Out",
+            "Sign out of this device", pink) {
+            confirmSignOut()
+        }
+
+        addRow(page, "🗑", "Delete Account",
+            "Delete your sign-in account", pink) {
+            confirmDeleteAccount()
+        }
+    }
+
+    private fun showProfileTab() {
+        showTabContent("Profile")
     }
 
     // WALLET
@@ -365,132 +631,7 @@ class MainActivity : Activity() {
         })
     }
 
-    // GIFTS
-
-    private fun showGifts() {
-        currentFeature = "Gifts"
-
-        val screen = page("Send a Gift")
-        val receiver = inputField("Receiver Firebase UID")
-
-        val giftList = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-
-        screen.addView(text("Receiver Firebase UID", 13f, muted, true))
-
-        screen.addView(
-            receiver,
-            LinearLayout.LayoutParams(-1, dp(52)).apply {
-                topMargin = dp(6)
-            }
-        )
-
-        screen.addView(
-            text("AVAILABLE GIFTS", 11f, cyan, true),
-            LinearLayout.LayoutParams(-1, -2).apply {
-                topMargin = dp(20)
-                bottomMargin = dp(10)
-            }
-        )
-
-        screen.addView(giftList)
-        setContentView(screen)
-
-        giftList.addView(text("Loading gifts...", 14f, muted, false))
-
-        WalletApi.getGifts(object : WalletApi.Callback<List<GiftItem>> {
-            override fun onSuccess(value: List<GiftItem>) {
-                runOnUiThread {
-                    giftList.removeAllViews()
-
-                    if (value.isEmpty()) {
-                        giftList.addView(
-                            text("No gifts available.", 14f, muted, false)
-                        )
-                        return@runOnUiThread
-                    }
-
-                    value.forEach { gift ->
-                        val bonus = if (gift.bonusCoins > 0) {
-                            "\nFixed bonus: ${gift.bonusCoins} Coins"
-                        } else {
-                            ""
-                        }
-
-                        giftList.addView(
-                            tile(
-                                "🎁",
-                                "${gift.name}\n${gift.price} Coins$bonus",
-                                cyan
-                            ) {
-                                val receiverUid =
-                                    receiver.text.toString().trim()
-
-                                if (receiverUid.isBlank()) {
-                                    notice("Enter receiver Firebase UID")
-                                    return@tile
-                                }
-
-                                val myUid = auth.currentUser?.uid
-
-                                if (receiverUid == myUid) {
-                                    notice("You cannot send a gift to yourself")
-                                    return@tile
-                                }
-
-                                AlertDialog.Builder(this@MainActivity)
-                                    .setTitle("Confirm Gift")
-                                    .setMessage(
-                                        "Gift: ${gift.name}\n" +
-                                            "Price: ${gift.price} Coins\n" +
-                                            "Receiver: $receiverUid"
-                                    )
-                                    .setNegativeButton("Cancel", null)
-                                    .setPositiveButton("Send Gift") { _, _ ->
-                                        sendGiftToUser(receiverUid, gift)
-                                    }
-                                    .show()
-                            },
-                            LinearLayout.LayoutParams(-1, dp(76)).apply {
-                                bottomMargin = dp(9)
-                            }
-                        )
-                    }
-                }
-            }
-
-            override fun onError(message: String) {
-                runOnUiThread {
-                    giftList.removeAllViews()
-                    giftList.addView(text(message, 14f, pink, false))
-                }
-            }
-        })
-    }
-
-    private fun sendGiftToUser(receiverUid: String, gift: GiftItem) {
-        WalletApi.sendGift(
-            receiverUid,
-            gift.id,
-            DEFAULT_ROOM_ID,
-            object : WalletApi.Callback<org.json.JSONObject> {
-                override fun onSuccess(value: org.json.JSONObject) {
-                    runOnUiThread {
-                        notice("${gift.name} sent successfully!")
-                    }
-                }
-
-                override fun onError(message: String) {
-                    runOnUiThread {
-                        notice("Gift failed: $message")
-                    }
-                }
-            }
-        )
-    }
-
-    // PROFILE
+    // PROFILE EDITING
 
     private fun showProfile() {
         currentFeature = "My Profile"
@@ -542,15 +683,6 @@ class MainActivity : Activity() {
             }
         )
 
-        screen.addView(
-            infoCard("LEVEL", "Not connected yet"),
-            LinearLayout.LayoutParams(-1, -2).apply {
-                topMargin = dp(10)
-            }
-        )
-
-        section(screen, "Personal Information", "EDIT DETAILS")
-
         profileName = inputField("Profile name")
         profileCountry = inputField("Country")
         profileAge = inputField("Age")
@@ -560,9 +692,10 @@ class MainActivity : Activity() {
             setPadding(dp(14), 0, dp(14), 0)
             background = fieldBackground()
             isClickable = true
-            isFocusable = true
             setOnClickListener { chooseGender() }
         }
+
+        section(screen, "Personal Information", "EDIT DETAILS")
 
         addLabeledField(screen, "Name", profileName)
         addLabeledField(screen, "Country", profileCountry)
@@ -597,11 +730,8 @@ class MainActivity : Activity() {
                 selectedGender = doc.getString("gender") ?: ""
 
                 profileGender.text =
-                    if (selectedGender.isBlank()) {
-                        "Select gender  ›"
-                    } else {
-                        "$selectedGender  ›"
-                    }
+                    if (selectedGender.isBlank()) "Select gender  ›"
+                    else "$selectedGender  ›"
 
                 syncPublicProfile(
                     doc.getString("name") ?: "",
@@ -615,7 +745,6 @@ class MainActivity : Activity() {
 
     private fun saveProfile() {
         val uid = auth.currentUser?.uid ?: return
-
         val name = profileName.text.toString().trim()
         val country = profileCountry.text.toString().trim()
         val ageText = profileAge.text.toString().trim()
@@ -669,11 +798,10 @@ class MainActivity : Activity() {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "image/*"
         }
-
         startActivityForResult(intent, PHOTO_REQUEST)
     }
 
-    @Deprecated("Deprecated in Android API")
+    @Deprecated("Deprecated Android API")
     override fun onActivityResult(
         requestCode: Int,
         resultCode: Int,
@@ -698,8 +826,6 @@ class MainActivity : Activity() {
                 .putString("photoUri", uri.toString())
                 .apply()
 
-            selectedPhoto = uri
-
             if (::profileImage.isInitialized) {
                 showPhoto(uri)
             }
@@ -707,8 +833,9 @@ class MainActivity : Activity() {
     }
 
     private fun loadLocalPhoto(): Uri? {
-        val value = photoPrefs.getString("photoUri", null)
-        return value?.let { Uri.parse(it) }
+        return photoPrefs.getString("photoUri", null)?.let {
+            Uri.parse(it)
+        }
     }
 
     private fun showPhoto(uri: Uri) {
@@ -721,10 +848,10 @@ class MainActivity : Activity() {
         }
     }
 
-    // FOLLOWERS AND CHAT CONTACTS
+    // FOLLOWERS
 
     private fun showPeople(chatOnly: Boolean) {
-        currentFeature = if (chatOnly) "Chat Messages" else "Followers"
+        currentFeature = if (chatOnly) "Messages" else "Followers"
 
         val screen = page(
             if (chatOnly) "Chat Contacts" else "Discover Users"
@@ -762,27 +889,23 @@ class MainActivity : Activity() {
                         .collection("following")
                         .document(targetId)
                         .get()
-                        .addOnSuccessListener { myFollow ->
+                        .addOnSuccessListener first@{ myFollow ->
 
                             db.collection("follows")
                                 .document(targetId)
                                 .collection("following")
                                 .document(myUid)
                                 .get()
-                                .addOnSuccessListener { theirFollow ->
+                                .addOnSuccessListener second@{ theirFollow ->
 
                                     val following = myFollow.exists()
                                     val mutual = following && theirFollow.exists()
 
-                                    if (chatOnly && !mutual) {
-                                        return@addOnSuccessListener
-                                    }
+                                    if (chatOnly && !mutual) return@second
 
                                     val userCard = LinearLayout(this).apply {
                                         orientation = LinearLayout.VERTICAL
-                                        setPadding(
-                                            dp(14), dp(14), dp(14), dp(14)
-                                        )
+                                        setPadding(dp(14), dp(14), dp(14), dp(14))
                                         background = cardBackground()
                                     }
 
@@ -810,9 +933,7 @@ class MainActivity : Activity() {
                                                     showPeople(false)
                                                 }
                                             },
-                                            LinearLayout.LayoutParams(
-                                                0, dp(44), 1f
-                                            )
+                                            LinearLayout.LayoutParams(0, dp(44), 1f)
                                         )
                                     }
 
@@ -821,9 +942,7 @@ class MainActivity : Activity() {
                                             button("MESSAGE") {
                                                 openChat(targetId, name)
                                             },
-                                            LinearLayout.LayoutParams(
-                                                0, dp(44), 1f
-                                            ).apply {
+                                            LinearLayout.LayoutParams(0, dp(44), 1f).apply {
                                                 if (!chatOnly) leftMargin = dp(8)
                                             }
                                         )
@@ -905,21 +1024,21 @@ class MainActivity : Activity() {
             .collection("following")
             .document(myUid)
 
-        myFollow.get().addOnSuccessListener firstCheck@{ first ->
+        myFollow.get().addOnSuccessListener first@{ first ->
             if (!first.exists()) {
                 notice("You both must follow each other to chat")
-                return@firstCheck
+                return@first
             }
 
-            theirFollow.get().addOnSuccessListener secondCheck@{ second ->
+            theirFollow.get().addOnSuccessListener second@{ second ->
                 if (!second.exists()) {
                     notice("You both must follow each other to chat")
-                    return@secondCheck
+                    return@second
                 }
 
                 db.collection("chats").document(chatId)
                     .get()
-                    .addOnSuccessListener chatCheck@{ existing ->
+                    .addOnSuccessListener check@{ existing ->
                         if (existing.exists()) {
                             showChatScreen(chatId, otherName)
                         } else {
@@ -934,9 +1053,7 @@ class MainActivity : Activity() {
                                     showChatScreen(chatId, otherName)
                                 }
                                 .addOnFailureListener {
-                                    notice(
-                                        "Could not start chat: ${it.localizedMessage}"
-                                    )
+                                    notice("Could not start chat: ${it.localizedMessage}")
                                 }
                         }
                     }
@@ -954,7 +1071,6 @@ class MainActivity : Activity() {
     private fun showChatScreen(chatId: String, otherName: String) {
         currentFeature = "Chat Messages"
         activeChatId = chatId
-        activeChatOtherName = otherName
 
         chatListener?.remove()
         chatListener = null
@@ -992,19 +1108,16 @@ class MainActivity : Activity() {
             maxLines = 4
         }
 
-        val send = button("SEND") {
-            sendMessage(chatId, input.text.toString(), input)
-        }
-
         val composer = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
 
         composer.addView(input, LinearLayout.LayoutParams(0, dp(52), 1f))
-
         composer.addView(
-            send,
+            button("SEND") {
+                sendMessage(chatId, input.text.toString(), input)
+            },
             LinearLayout.LayoutParams(dp(90), dp(52)).apply {
                 leftMargin = dp(8)
             }
@@ -1036,16 +1149,16 @@ class MainActivity : Activity() {
 
         val uid = auth.currentUser?.uid ?: return
 
-        val data = mapOf(
-            "senderId" to uid,
-            "text" to message,
-            "createdAt" to FieldValue.serverTimestamp()
-        )
-
         db.collection("chats")
             .document(chatId)
             .collection("messages")
-            .add(data)
+            .add(
+                mapOf(
+                    "senderId" to uid,
+                    "text" to message,
+                    "createdAt" to FieldValue.serverTimestamp()
+                )
+            )
             .addOnSuccessListener {
                 input.text.clear()
             }
@@ -1083,9 +1196,7 @@ class MainActivity : Activity() {
                         setTextColor(white)
                         setPadding(dp(12), dp(10), dp(12), dp(10))
                         background = messageBackground(mine)
-                        maxWidth = (
-                            resources.displayMetrics.widthPixels * 0.78f
-                        ).toInt()
+                        maxWidth = (resources.displayMetrics.widthPixels * 0.78f).toInt()
                     }
 
                     val row = LinearLayout(this).apply {
@@ -1107,7 +1218,30 @@ class MainActivity : Activity() {
             }
     }
 
-    // PASSWORD AND ACCOUNT
+    // ACCOUNT SETTINGS
+
+    private fun showAccountSettings() {
+        currentFeature = "Account Settings"
+
+        val screen = page("Account Settings")
+
+        addRow(screen, "🔐", "Update Password",
+            "Change your account password", gold) {
+            showPasswordScreen()
+        }
+
+        addRow(screen, "🚪", "Sign Out",
+            "Sign out of this device", pink) {
+            confirmSignOut()
+        }
+
+        addRow(screen, "🗑", "Delete Account",
+            "Delete your sign-in account", pink) {
+            confirmDeleteAccount()
+        }
+
+        setContentView(screen)
+    }
 
     private fun showPasswordScreen() {
         currentFeature = "Update Password"
@@ -1156,9 +1290,7 @@ class MainActivity : Activity() {
                         notice("Password updated successfully")
                     }
                     .addOnFailureListener {
-                        notice(
-                            "Password update failed. Sign in again and retry."
-                        )
+                        notice("Password update failed. Sign in again and retry.")
                     }
             },
             LinearLayout.LayoutParams(-1, dp(52)).apply {
@@ -1189,8 +1321,7 @@ class MainActivity : Activity() {
             .setTitle("Account Deletion")
             .setMessage(
                 "This will delete your sign-in account. " +
-                    "Your Firestore profile and other data may still remain. " +
-                    "Continue only if you understand this."
+                    "Your Firestore profile and other data may still remain."
             )
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Continue") { _, _ ->
@@ -1209,12 +1340,26 @@ class MainActivity : Activity() {
                         finish()
                     }
                     .addOnFailureListener {
-                        notice(
-                            "Deletion failed. Sign in again and retry."
-                        )
+                        notice("Deletion failed. Sign in again and retry.")
                     }
             }
             .show()
+    }
+
+    // SIMPLE SCREENS
+
+    private fun showSimpleScreen(title: String, message: String) {
+        currentFeature = title
+        val screen = page(title)
+
+        screen.addView(
+            infoCard(title.uppercase(), message),
+            LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(18)
+            }
+        )
+
+        setContentView(screen)
     }
 
     // UI HELPERS
@@ -1237,7 +1382,6 @@ class MainActivity : Activity() {
         }
 
         top.addView(back, LinearLayout.LayoutParams(dp(42), dp(48)))
-
         top.addView(
             text(title, 21f, white, true),
             LinearLayout.LayoutParams(0, -2, 1f)
@@ -1308,50 +1452,13 @@ class MainActivity : Activity() {
         parent.addView(box)
     }
 
-    private fun addGrid(
-        parent: LinearLayout,
-        icon1: String,
-        title1: String,
-        icon2: String,
-        title2: String
-    ) {
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        row.addView(
-            tile(icon1, title1, cyan) {
-                showFeature(title1)
-            },
-            LinearLayout.LayoutParams(0, dp(78), 1f).apply {
-                rightMargin = dp(6)
-            }
-        )
-
-        row.addView(
-            tile(icon2, title2, purple) {
-                showFeature(title2)
-            },
-            LinearLayout.LayoutParams(0, dp(78), 1f).apply {
-                leftMargin = dp(6)
-            }
-        )
-
-        parent.addView(
-            row,
-            LinearLayout.LayoutParams(-1, -2).apply {
-                bottomMargin = dp(10)
-            }
-        )
-    }
-
     private fun addRow(
         parent: LinearLayout,
         icon: String,
         title: String,
         description: String,
-        accent: Int
+        accent: Int,
+        action: () -> Unit
     ) {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -1374,7 +1481,7 @@ class MainActivity : Activity() {
         }
 
         row.addView(labels, LinearLayout.LayoutParams(0, -2, 1f))
-        row.setOnClickListener { showFeature(title) }
+        row.setOnClickListener { action() }
 
         parent.addView(
             row,
@@ -1437,10 +1544,7 @@ class MainActivity : Activity() {
             }
         )
 
-        parent.addView(
-            view,
-            LinearLayout.LayoutParams(-1, dp(50))
-        )
+        parent.addView(view, LinearLayout.LayoutParams(-1, dp(50)))
     }
 
     private fun infoCard(
@@ -1497,21 +1601,14 @@ class MainActivity : Activity() {
     private fun messageBackground(mine: Boolean): GradientDrawable {
         return GradientDrawable().apply {
             setColor(
-                if (mine) {
-                    Color.rgb(52, 93, 137)
-                } else {
-                    Color.rgb(48, 52, 83)
-                }
+                if (mine) Color.rgb(52, 93, 137)
+                else Color.rgb(48, 52, 83)
             )
             cornerRadius = dp(16).toFloat()
         }
     }
 
     private fun notice(message: String) {
-        Toast.makeText(
-            this,
-            message,
-            Toast.LENGTH_LONG
-        ).show()
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 }
