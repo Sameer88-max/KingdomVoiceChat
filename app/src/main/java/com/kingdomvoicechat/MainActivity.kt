@@ -1,3 +1,4 @@
+
 package com.kingdomvoicechat
 
 import android.app.Activity
@@ -8,9 +9,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
-import android.provider.MediaStore
 import android.view.Gravity
-import android.view.View
 import android.widget.*
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -27,12 +26,9 @@ class MainActivity : Activity() {
     private val white = Color.WHITE
     private val muted = Color.rgb(175, 188, 215)
     private val cyan = Color.rgb(55, 220, 240)
-    private val purple = Color.rgb(135, 95, 255)
-    private val gold = Color.rgb(255, 190, 80)
 
     private var currentTab = "Home"
     private var currentFeature: String? = null
-
     private var selectedGender = "Not specified"
 
     private lateinit var profileName: EditText
@@ -51,7 +47,6 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         KingdomTheme.applyTo(this)
 
         if (auth.currentUser == null) {
@@ -61,10 +56,6 @@ class MainActivity : Activity() {
 
         ensurePublicProfile()
         showTab("Home")
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
     }
 
     @Deprecated("Deprecated in Android")
@@ -79,9 +70,7 @@ class MainActivity : Activity() {
         }
     }
 
-    // ------------------------------------------------
     // USER PROFILE CREATION
-    // ------------------------------------------------
 
     private fun ensurePublicProfile() {
         val user = auth.currentUser ?: return
@@ -92,7 +81,6 @@ class MainActivity : Activity() {
             .document("userNumericId")
 
         db.runTransaction { transaction ->
-
             val userDoc = transaction.get(userRef)
             val publicDoc = transaction.get(publicRef)
 
@@ -113,7 +101,6 @@ class MainActivity : Activity() {
                     mapOf("lastId" to newId),
                     SetOptions.merge()
                 )
-
                 newId
             }
 
@@ -142,31 +129,34 @@ class MainActivity : Activity() {
     private fun syncPublicProfile(name: String, country: String) {
         val user = auth.currentUser ?: return
 
-        val userRef = db.collection("users").document(user.uid)
+        db.collection("users").document(user.uid).get()
+            .addOnSuccessListener { document ->
 
-        userRef.get().addOnSuccessListener { document ->
+                val data = hashMapOf<String, Any>(
+                    "name" to name,
+                    "country" to country,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
 
-            val numericId = document.getLong("numericId")
+                document.getLong("numericId")?.let {
+                    data["numericId"] = it
+                }
 
-            val data = hashMapOf<String, Any>(
-                "name" to name,
-                "country" to country,
-                "updatedAt" to FieldValue.serverTimestamp()
-            )
+                document.getString("gender")?.let {
+                    data["gender"] = it
+                }
 
-            if (numericId != null) {
-                data["numericId"] = numericId
+                document.get("age")?.let {
+                    data["age"] = it
+                }
+
+                db.collection("publicProfiles")
+                    .document(user.uid)
+                    .set(data, SetOptions.merge())
             }
-
-            db.collection("publicProfiles")
-                .document(user.uid)
-                .set(data, SetOptions.merge())
-        }
     }
 
-    // ------------------------------------------------
     // NAVIGATION
-    // ------------------------------------------------
 
     private fun showTab(tab: String) {
         currentTab = tab
@@ -181,7 +171,6 @@ class MainActivity : Activity() {
     }
 
     private fun createTabLayout(): Pair<LinearLayout, LinearLayout> {
-
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(bg)
@@ -197,18 +186,13 @@ class MainActivity : Activity() {
             addView(content)
         }
 
-        root.addView(
-            scroll,
-            LinearLayout.LayoutParams(-1, 0, 1f)
-        )
-
+        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(bottomNavigation())
 
         return Pair(root, content)
     }
 
     private fun bottomNavigation(): LinearLayout {
-
         val nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -224,40 +208,27 @@ class MainActivity : Activity() {
         )
 
         items.forEach { item ->
-
             val selected = currentTab == item.second
 
-            val button = LinearLayout(this).apply {
+            val itemView = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
                 isClickable = true
                 isFocusable = true
-
                 setOnClickListener {
                     showTab(item.second)
                 }
             }
 
-            button.addView(
-                text(
-                    item.first,
-                    22f,
-                    if (selected) cyan else muted,
-                    true
-                )
+            itemView.addView(
+                text(item.first, 22f, if (selected) cyan else muted, true)
             )
-
-            button.addView(
-                text(
-                    item.second,
-                    11f,
-                    if (selected) cyan else muted,
-                    selected
-                )
+            itemView.addView(
+                text(item.second, 11f, if (selected) cyan else muted, selected)
             )
 
             nav.addView(
-                button,
+                itemView,
                 LinearLayout.LayoutParams(0, dp(55), 1f)
             )
         }
@@ -265,21 +236,13 @@ class MainActivity : Activity() {
         return nav
     }
 
-    // ------------------------------------------------
     // HOME
-    // ------------------------------------------------
 
     private fun showHome() {
+        val (root, content) = createTabLayout()
 
-        val (root, page) = createTabLayout()
-
-        page.addView(
-            text("♛ KINGDOM VOICE CHAT", 23f, white, true)
-        )
-
-        page.addView(
-            text("VOICE • CHAT • CONNECT", 11f, cyan, true)
-        )
+        content.addView(text("♛ KINGDOM VOICE CHAT", 23f, white, true))
+        content.addView(text("VOICE • CHAT • CONNECT", 11f, cyan, true))
 
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -292,30 +255,19 @@ class MainActivity : Activity() {
             )
         }
 
+        hero.addView(text("YOUR WORLD. YOUR VOICE.", 12f, cyan, true))
         hero.addView(
-            text("YOUR WORLD. YOUR VOICE.", 12f, cyan, true)
-        )
-
-        hero.addView(
-            text(
-                "Find your people.",
-                28f,
-                white,
-                true
-            ).apply {
+            text("Find your people.", 28f, white, true).apply {
                 setPadding(0, dp(12), 0, dp(8))
             }
         )
-
         hero.addView(
             text(
                 "Join rooms, meet friends and share your voice.",
                 14f,
-                white,
-                false
+                white
             )
         )
-
         hero.addView(
             button("Explore Voice Rooms") {
                 showTab("Rooms")
@@ -325,91 +277,51 @@ class MainActivity : Activity() {
             }
         )
 
-        page.addView(
+        content.addView(
             hero,
             LinearLayout.LayoutParams(-1, -2).apply {
                 topMargin = dp(22)
             }
         )
 
-        section(page, "Discover")
+        section(content, "Discover")
 
-        addRow(
-            page,
-            "👑",
-            "Official Rooms",
-            "Explore official voice rooms"
-        ) {
+        addRow(content, "👑", "Official Rooms", "Explore official voice rooms") {
             showTab("Rooms")
         }
-
-        addRow(
-            page,
-            "🎙",
-            "Normal Rooms",
-            "Discover public voice rooms"
-        ) {
+        addRow(content, "🎙", "Normal Rooms", "Discover public rooms") {
             showTab("Rooms")
         }
-
-        addRow(
-            page,
-            "💬",
-            "Messages",
-            "Connect with other users"
-        ) {
+        addRow(content, "💬", "Messages", "Connect with other users") {
             showTab("Messages")
         }
-
-        addRow(
-            page,
-            "💎",
-            "My Wallet",
-            "View Coins and Pearls"
-        ) {
+        addRow(content, "💎", "My Wallet", "View Coins and Pearls") {
             showWallet()
         }
 
         setContentView(root)
     }
 
-    // ------------------------------------------------
     // ROOMS
-    // ------------------------------------------------
 
     private fun showRooms() {
+        val (root, content) = createTabLayout()
 
-        val (root, page) = createTabLayout()
-
-        page.addView(
-            text("Explore Rooms", 25f, white, true)
-        )
-
-        page.addView(
+        content.addView(text("Explore Rooms", 25f, white, true))
+        content.addView(
             text("Join a voice room using its Room ID.", 13f, muted)
         )
 
-        section(page, "Room Categories")
+        section(content, "Room Categories")
 
-        addRow(
-            page,
-            "👑",
-            "Official Rooms",
-            "Kingdom official rooms"
-        ) {
+        addRow(content, "👑", "Official Rooms", "Kingdom official rooms") {
+            enterRoom()
+        }
+        addRow(content, "🎙", "Public Rooms", "Join a public room") {
             enterRoom()
         }
 
-        addRow(
-            page,
-            "🎙",
-            "Public Rooms",
-            "Join a public room"
-        ) {
-            enterRoom()
-        }
-
-        page.addView(
+        content.addView(
             button("Enter Room ID") {
                 enterRoom()
             },
@@ -422,7 +334,6 @@ class MainActivity : Activity() {
     }
 
     private fun enterRoom() {
-
         val input = EditText(this).apply {
             hint = "Enter Room ID"
             setTextColor(white)
@@ -435,7 +346,6 @@ class MainActivity : Activity() {
             .setView(input)
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Join") { _, _ ->
-
                 val roomId = input.text.toString().trim()
 
                 if (roomId.isBlank()) {
@@ -450,55 +360,26 @@ class MainActivity : Activity() {
             .show()
     }
 
-    // ------------------------------------------------
     // MESSAGES
-    // ------------------------------------------------
 
     private fun showMessages() {
+        val (root, content) = createTabLayout()
 
-        val (root, page) = createTabLayout()
+        content.addView(text("Messages", 25f, white, true))
+        content.addView(text("Connect with Kingdom users.", 13f, muted))
 
-        page.addView(
-            text("Messages", 25f, white, true)
-        )
+        section(content, "Communication")
 
-        page.addView(
-            text(
-                "Connect with Kingdom users.",
-                13f,
-                muted
-            )
-        )
-
-        section(page, "Communication")
-
-        addRow(
-            page,
-            "👥",
-            "People",
-            "Find registered users"
-        ) {
+        addRow(content, "👥", "People", "Find registered users") {
             showPeople()
         }
-
-        addRow(
-            page,
-            "💬",
-            "Chats",
-            "Your conversations"
-        ) {
+        addRow(content, "💬", "Chats", "Your conversations") {
             showSimpleScreen(
                 "Chats",
                 "Chat conversations will appear here when the messaging backend is connected."
             )
         }
-
-        addRow(
-            page,
-            "🎙",
-            "Voice Rooms",
-            "Talk with people"
-        ) {
+        addRow(content, "🎙", "Voice Rooms", "Talk with people") {
             showTab("Rooms")
         }
 
@@ -506,59 +387,54 @@ class MainActivity : Activity() {
     }
 
     private fun showPeople() {
+        currentFeature = "People"
 
-        val page = page("People")
+        val root = page("People")
+        val content = root.tag as LinearLayout
 
         val list = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
 
-        page.addView(list)
-
-        setContentView(page)
+        content.addView(list)
+        setContentView(root)
+        list.addView(text("Loading users...", 14f, muted))
 
         db.collection("publicProfiles")
             .limit(50)
             .get()
             .addOnSuccessListener { result ->
-
                 list.removeAllViews()
 
                 if (result.isEmpty) {
-                    list.addView(
-                        text("No users found.", 14f, muted)
-                    )
+                    list.addView(text("No users found.", 14f, muted))
                     return@addOnSuccessListener
                 }
 
-                for (document in result.documents) {
-
-                    val name = document.getString("name")
-                        ?: "Kingdom User"
-
+                result.documents.forEach { document ->
+                    val name = document.getString("name") ?: "Kingdom User"
                     val country = document.getString("country") ?: ""
                     val uid = document.id
+                    val numericId = document.getLong("numericId") ?: 0L
 
                     addRow(
                         list,
                         "👤",
                         name,
-                        "$country  •  ID: ${document.getLong("numericId") ?: "-"}"
+                        "$country • ID: $numericId"
                     ) {
                         showUserDetails(uid, name, country)
                     }
                 }
             }
             .addOnFailureListener {
+                list.removeAllViews()
+                list.addView(text("Unable to load users.", 14f, muted))
                 notice(it.localizedMessage ?: "Unable to load users")
             }
     }
 
-    private fun showUserDetails(
-        uid: String,
-        name: String,
-        country: String
-    ) {
+    private fun showUserDetails(uid: String, name: String, country: String) {
         AlertDialog.Builder(this)
             .setTitle(name)
             .setMessage("Country: $country\nUser UID:\n$uid")
@@ -566,19 +442,13 @@ class MainActivity : Activity() {
             .show()
     }
 
-    // ------------------------------------------------
     // PROFILE MENU
-    // ------------------------------------------------
 
     private fun showProfileMenu() {
-
-        val (root, page) = createTabLayout()
-
+        val (root, content) = createTabLayout()
         val user = auth.currentUser
 
-        page.addView(
-            text("My Profile", 25f, white, true)
-        )
+        content.addView(text("My Profile", 25f, white, true))
 
         val profileCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -595,69 +465,50 @@ class MainActivity : Activity() {
         }
 
         loadProfileImage(image)
-
         profileCard.addView(image)
 
         profileCard.addView(
-            text(
-                user?.email ?: "Kingdom User",
-                18f,
-                white,
-                true
-            ).apply {
+            text(user?.email ?: "Kingdom User", 18f, white, true).apply {
                 setPadding(0, dp(12), 0, dp(5))
             }
         )
+        profileCard.addView(text("UID: ${user?.uid ?: "-"}", 11f, muted))
 
-        profileCard.addView(
-            text(
-                "UID: ${user?.uid ?: "-"}",
-                11f,
-                muted
-            )
-        )
-
-        page.addView(
+        content.addView(
             profileCard,
             LinearLayout.LayoutParams(-1, -2).apply {
                 topMargin = dp(18)
             }
         )
 
-        section(page, "Account")
+        section(content, "Account")
 
-        addRow(page, "✏", "Edit Profile", "Update your profile") {
+        addRow(content, "✏", "Edit Profile", "Update your profile") {
             showProfile()
         }
-
-        addRow(page, "💎", "Wallet", "Coins and Pearls") {
+        addRow(content, "💎", "Wallet", "Coins and Pearls") {
             showWallet()
         }
-
-        addRow(page, "🎁", "Gift Store", "View available gifts") {
+        addRow(content, "🎁", "Gift Store", "View available gifts") {
             showGiftStore()
         }
-
-        addRow(page, "⚙", "Settings", "Account settings") {
+        addRow(content, "⚙", "Settings", "Account settings") {
             showAccountSettings()
         }
-
-        addRow(page, "🚪", "Sign Out", "Sign out of your account") {
+        addRow(content, "🚪", "Sign Out", "Sign out of your account") {
             confirmSignOut()
         }
 
         setContentView(root)
     }
 
-    // ------------------------------------------------
     // PROFILE EDITING
-    // ------------------------------------------------
 
     private fun showProfile() {
-
         currentFeature = "Edit Profile"
 
-        val page = page("Edit Profile")
+        val root = page("Edit Profile")
+        val content = root.tag as LinearLayout
 
         profileImage = ImageView(this).apply {
             layoutParams = LinearLayout.LayoutParams(dp(110), dp(110))
@@ -668,60 +519,56 @@ class MainActivity : Activity() {
 
         loadProfileImage(profileImage)
 
-        page.addView(
+        content.addView(
             profileImage,
             LinearLayout.LayoutParams(dp(110), dp(110)).apply {
                 gravity = Gravity.CENTER_HORIZONTAL
             }
         )
 
-        page.addView(
-            button("Change Profile Photo") {
-                choosePhoto()
-            }
-        )
+        content.addView(button("Change Profile Photo") {
+            choosePhoto()
+        })
 
         profileName = inputField("Your Name")
         profileCountry = inputField("Country")
         profileAge = inputField("Age")
 
-        page.addView(label("Name"))
-        page.addView(profileName)
+        content.addView(label("Name"))
+        content.addView(profileName)
+        content.addView(label("Country"))
+        content.addView(profileCountry)
+        content.addView(label("Age"))
+        content.addView(profileAge)
+        content.addView(label("Gender"))
 
-        page.addView(label("Country"))
-        page.addView(profileCountry)
+        lateinit var genderButton: TextView
+        genderButton = button("Select Gender: $selectedGender") {
+            val genders = arrayOf("Male", "Female", "Other", "Not specified")
 
-        page.addView(label("Age"))
-        page.addView(profileAge)
-
-        page.addView(label("Gender"))
-
-        val genderButton = button("Select Gender: $selectedGender") {
             AlertDialog.Builder(this)
                 .setTitle("Select Gender")
-                .setItems(arrayOf("Male", "Female", "Other", "Not specified")) { _, which ->
-                    selectedGender = arrayOf(
-                        "Male",
-                        "Female",
-                        "Other",
-                        "Not specified"
-                    )[which]
-
-                    genderButtonTextUpdate()
+                .setItems(genders) { _, which ->
+                    selectedGender = genders[which]
+                    genderButton.text = "Select Gender: $selectedGender"
                 }
                 .show()
         }
 
-        page.addView(genderButton)
+        content.addView(genderButton)
 
         val saveButton = button("Save Profile") {
-
             val name = profileName.text.toString().trim()
             val country = profileCountry.text.toString().trim()
             val age = profileAge.text.toString().trim()
 
             if (name.isBlank()) {
                 notice("Please enter your name")
+                return@button
+            }
+
+            if (age.isNotBlank() && age.toIntOrNull() == null) {
+                notice("Enter a valid age")
                 return@button
             }
 
@@ -735,16 +582,14 @@ class MainActivity : Activity() {
             )
 
             if (age.isNotBlank()) {
-                data["age"] = age
+                data["age"] = age.toInt()
             }
 
             db.collection("users")
                 .document(user.uid)
                 .set(data, SetOptions.merge())
                 .addOnSuccessListener {
-
                     syncPublicProfile(name, country)
-
                     notice("Profile saved successfully")
                     currentFeature = null
                     showProfileMenu()
@@ -754,64 +599,38 @@ class MainActivity : Activity() {
                 }
         }
 
-        page.addView(
+        content.addView(
             saveButton,
             LinearLayout.LayoutParams(-1, dp(52)).apply {
                 topMargin = dp(20)
             }
         )
 
-        setContentView(page)
+        setContentView(root)
 
         auth.currentUser?.let { user ->
-            db.collection("users")
-                .document(user.uid)
-                .get()
+            db.collection("users").document(user.uid).get()
                 .addOnSuccessListener { document ->
+                    if (isFinishing || isDestroyed) return@addOnSuccessListener
 
                     profileName.setText(document.getString("name") ?: "")
                     profileCountry.setText(document.getString("country") ?: "")
-                    profileAge.setText(
-                        document.get("age")?.toString() ?: ""
-                    )
+                    profileAge.setText(document.get("age")?.toString() ?: "")
 
                     selectedGender =
                         document.getString("gender") ?: "Not specified"
 
                     genderButton.text = "Select Gender: $selectedGender"
                 }
+                .addOnFailureListener {
+                    notice(it.localizedMessage ?: "Unable to load profile")
+                }
         }
-
-        genderButton.tag = "gender"
     }
 
-    private fun genderButtonTextUpdate() {
-        val root = findViewById<LinearLayout>(android.R.id.content)
-        val button = findTextView(root, "Select Gender:")
-        button?.text = "Select Gender: $selectedGender"
-    }
-
-    private fun findTextView(view: View, startsWith: String): TextView? {
-        if (view is TextView && view.text.toString().startsWith(startsWith)) {
-            return view
-        }
-
-        if (view is LinearLayout) {
-            for (i in 0 until view.childCount) {
-                val found = findTextView(view.getChildAt(i), startsWith)
-                if (found != null) return found
-            }
-        }
-
-        return null
-    }
-
-    // ------------------------------------------------
     // PHOTO PICKER
-    // ------------------------------------------------
 
     private fun choosePhoto() {
-
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             type = "image/*"
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -831,7 +650,6 @@ class MainActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
 
         if (requestCode == PHOTO_REQUEST && resultCode == RESULT_OK) {
-
             val uri = data?.data ?: return
 
             try {
@@ -842,9 +660,7 @@ class MainActivity : Activity() {
             } catch (_: Exception) {
             }
 
-            prefs.edit()
-                .putString("profile_photo", uri.toString())
-                .apply()
+            prefs.edit().putString("profile_photo", uri.toString()).apply()
 
             if (::profileImage.isInitialized) {
                 profileImage.setImageURI(uri)
@@ -868,35 +684,26 @@ class MainActivity : Activity() {
         }
     }
 
-    // ------------------------------------------------
-    // WALLET API
-    // ------------------------------------------------
+    // WALLET
 
     private fun showWallet() {
-
         currentFeature = "Wallet"
 
-        val page = page("My Wallet")
+        val root = page("My Wallet")
+        val content = root.tag as LinearLayout
 
-        val balanceText = text(
-            "Loading wallet...",
-            20f,
-            cyan,
-            true
-        )
+        val balanceText = text("Loading wallet...", 20f, cyan, true)
 
-        page.addView(
+        content.addView(
             balanceText,
             LinearLayout.LayoutParams(-1, dp(90))
         )
 
-        page.addView(
-            button("Refresh Balance") {
-                loadWallet(balanceText)
-            }
-        )
+        content.addView(button("Refresh Balance") {
+            loadWallet(balanceText)
+        })
 
-        page.addView(
+        content.addView(
             button("Open Gift Store") {
                 showGiftStore()
             },
@@ -905,7 +712,7 @@ class MainActivity : Activity() {
             }
         )
 
-        page.addView(
+        content.addView(
             text(
                 "Wallet balance is provided by the Kingdom Wallet API.",
                 12f,
@@ -915,76 +722,66 @@ class MainActivity : Activity() {
             }
         )
 
-        setContentView(page)
-
+        setContentView(root)
         loadWallet(balanceText)
     }
 
     private fun loadWallet(target: TextView) {
-
         target.text = "Loading wallet..."
 
         WalletApi.getWallet(object : WalletApi.Callback<WalletBalance> {
-
             override fun onSuccess(value: WalletBalance) {
                 runOnUiThread {
-                    target.text =
-                        "🪙 Coins: ${value.coins}\n💎 Pearls: ${value.pearls}"
+                    if (!isFinishing && !isDestroyed) {
+                        target.text =
+                            "🪙 Coins: ${value.coins}\n💎 Pearls: ${value.pearls}"
+                    }
                 }
             }
 
             override fun onError(message: String) {
                 runOnUiThread {
-                    target.text = "Wallet unavailable"
-                    notice(message)
+                    if (!isFinishing && !isDestroyed) {
+                        target.text = "Wallet unavailable"
+                        notice(message)
+                    }
                 }
             }
         })
     }
 
-    // ------------------------------------------------
     // GIFT STORE
-    // ------------------------------------------------
 
     private fun showGiftStore() {
-
         currentFeature = "Gift Store"
 
-        val page = page("Gift Store")
+        val root = page("Gift Store")
+        val content = root.tag as LinearLayout
 
-        page.addView(
-            text(
-                "Available gifts",
-                14f,
-                muted
-            )
-        )
+        content.addView(text("Available gifts", 14f, muted))
 
         val list = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
 
-        page.addView(list)
+        content.addView(list)
+        setContentView(root)
 
-        setContentView(page)
+        list.addView(text("Loading gifts...", 14f, muted))
 
         WalletApi.getGifts(object : WalletApi.Callback<List<GiftItem>> {
-
             override fun onSuccess(value: List<GiftItem>) {
-
                 runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
 
                     list.removeAllViews()
 
                     if (value.isEmpty()) {
-                        list.addView(
-                            text("No gifts available.", 14f, muted)
-                        )
+                        list.addView(text("No gifts available.", 14f, muted))
                         return@runOnUiThread
                     }
 
                     value.forEach { gift ->
-
                         addRow(
                             list,
                             "🎁",
@@ -999,17 +796,16 @@ class MainActivity : Activity() {
 
             override fun onError(message: String) {
                 runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    list.removeAllViews()
+                    list.addView(text("Unable to load gifts.", 14f, muted))
                     notice(message)
-                    list.addView(
-                        text("Unable to load gifts.", 14f, muted)
-                    )
                 }
             }
         })
     }
 
     private fun askGiftReceiver(gift: GiftItem) {
-
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(8), dp(18), dp(8))
@@ -1036,7 +832,6 @@ class MainActivity : Activity() {
             .setView(box)
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Send Gift") { _, _ ->
-
                 val receiver = receiverInput.text.toString().trim()
                 val roomId = roomInput.text.toString().trim()
 
@@ -1050,7 +845,6 @@ class MainActivity : Activity() {
                     gift.id,
                     roomId,
                     object : WalletApi.Callback<org.json.JSONObject> {
-
                         override fun onSuccess(value: org.json.JSONObject) {
                             runOnUiThread {
                                 notice("Gift sent successfully")
@@ -1069,62 +863,41 @@ class MainActivity : Activity() {
             .show()
     }
 
-    // ------------------------------------------------
     // SETTINGS
-    // ------------------------------------------------
 
     private fun showAccountSettings() {
+        currentFeature = "Settings"
 
-        val page = page("Settings")
+        val root = page("Settings")
+        val content = root.tag as LinearLayout
 
-        addRow(
-            page,
-            "🎨",
-            "Theme Settings",
-            "Change app appearance"
-        ) {
-            startActivity(
-                Intent(this, ThemeSettingsActivity::class.java)
-            )
+        addRow(content, "🎨", "Theme Settings", "Change app appearance") {
+            startActivity(Intent(this, ThemeSettingsActivity::class.java))
         }
 
-        addRow(
-            page,
-            "👑",
-            "Owner Panel",
-            "Open owner controls"
-        ) {
-            startActivity(
-                Intent(this, OwnerPanelActivity::class.java)
-            )
+        addRow(content, "👑", "Owner Panel", "Open owner controls") {
+            startActivity(Intent(this, OwnerPanelActivity::class.java))
         }
 
-        addRow(
-            page,
-            "🚪",
-            "Sign Out",
-            "Sign out of your account"
-        ) {
+        addRow(content, "🚪", "Sign Out", "Sign out of your account") {
             confirmSignOut()
         }
 
-        setContentView(page)
+        setContentView(root)
     }
 
     private fun confirmSignOut() {
-
         AlertDialog.Builder(this)
             .setTitle("Sign Out")
             .setMessage("Are you sure you want to sign out?")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Sign Out") { _, _ ->
-
                 auth.signOut()
 
-                val intent = Intent(this, AuthActivity::class.java)
-                intent.flags =
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_CLEAR_TASK
+                val intent = Intent(this, AuthActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TASK
+                }
 
                 startActivity(intent)
                 finish()
@@ -1132,12 +905,9 @@ class MainActivity : Activity() {
             .show()
     }
 
-    // ------------------------------------------------
     // BASIC SCREEN HELPERS
-    // ------------------------------------------------
 
     private fun page(title: String): LinearLayout {
-
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(18), dp(18), dp(18))
@@ -1156,7 +926,6 @@ class MainActivity : Activity() {
         }
 
         header.addView(back)
-
         header.addView(
             text(title, 22f, white, true).apply {
                 setPadding(dp(12), 0, 0, 0)
@@ -1174,14 +943,9 @@ class MainActivity : Activity() {
         }
 
         scroll.addView(content)
-
-        root.addView(
-            scroll,
-            LinearLayout.LayoutParams(-1, 0, 1f)
-        )
+        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
 
         root.tag = content
-
         return root
     }
 
@@ -1215,7 +979,6 @@ class MainActivity : Activity() {
         subtitle: String,
         action: () -> Unit
     ) {
-
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -1226,28 +989,17 @@ class MainActivity : Activity() {
             setOnClickListener { action() }
         }
 
-        row.addView(
-            text(icon, 25f, cyan, true)
-        )
+        row.addView(text(icon, 25f, cyan, true))
 
         val labels = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), 0, 0, 0)
         }
 
-        labels.addView(
-            text(title, 15f, white, true)
-        )
+        labels.addView(text(title, 15f, white, true))
+        labels.addView(text(subtitle, 11f, muted))
 
-        labels.addView(
-            text(subtitle, 11f, muted)
-        )
-
-        row.addView(
-            labels,
-            LinearLayout.LayoutParams(0, -2, 1f)
-        )
-
+        row.addView(labels, LinearLayout.LayoutParams(0, -2, 1f))
         row.addView(text("›", 24f, muted))
 
         parent.addView(
@@ -1281,15 +1033,11 @@ class MainActivity : Activity() {
         color: Int,
         bold: Boolean = false
     ): TextView {
-
         return TextView(this).apply {
             text = value
             textSize = size
             setTextColor(color)
-
-            if (bold) {
-                typeface = Typeface.DEFAULT_BOLD
-            }
+            if (bold) typeface = Typeface.DEFAULT_BOLD
         }
     }
 
@@ -1297,7 +1045,6 @@ class MainActivity : Activity() {
         title: String,
         action: () -> Unit
     ): TextView {
-
         return TextView(this).apply {
             text = title
             textSize = 14f
