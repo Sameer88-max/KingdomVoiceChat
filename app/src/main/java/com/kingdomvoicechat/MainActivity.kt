@@ -9,6 +9,7 @@ import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
+import android.view.View
 import android.widget.*
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -21,12 +22,16 @@ class MainActivity : Activity() {
     private val auth by lazy { FirebaseAuth.getInstance() }
     private val db by lazy { FirebaseFirestore.getInstance() }
     private val functions by lazy { FirebaseFunctions.getInstance() }
+    private val prefs by lazy { getSharedPreferences("kvc_profile", MODE_PRIVATE) }
 
-    private val bg = Color.rgb(10, 15, 35)
-    private val card = Color.rgb(25, 34, 65)
+    private val bg = Color.rgb(4, 8, 38)
+    private val panel = Color.rgb(13, 22, 67)
+    private val panel2 = Color.rgb(20, 29, 82)
+    private val cyan = Color.rgb(0, 224, 255)
+    private val blue = Color.rgb(20, 104, 255)
+    private val purple = Color.rgb(174, 0, 255)
     private val white = Color.WHITE
-    private val muted = Color.rgb(175, 188, 215)
-    private val cyan = Color.rgb(55, 220, 240)
+    private val muted = Color.rgb(184, 199, 235)
 
     private var currentTab = "Home"
     private var currentFeature: String? = null
@@ -36,10 +41,6 @@ class MainActivity : Activity() {
     private lateinit var profileCountry: EditText
     private lateinit var profileAge: EditText
     private lateinit var profileImage: ImageView
-
-    private val prefs by lazy {
-        getSharedPreferences("kvc_profile", MODE_PRIVATE)
-    }
 
     companion object {
         private const val PHOTO_REQUEST = 501
@@ -70,25 +71,21 @@ class MainActivity : Activity() {
         }
     }
 
-    // USER PROFILE CREATION AND CLOUD FUNCTION SYNC
+    // FIREBASE PROFILE SYNC
 
     private fun ensurePublicProfile() {
         val user = auth.currentUser ?: return
 
-        db.collection("users").document(user.uid)
-            .get()
-            .addOnSuccessListener { document ->
-
-                val name = document.getString("name")
+        db.collection("users").document(user.uid).get()
+            .addOnSuccessListener { doc ->
+                val name = doc.getString("name")
                     ?: user.email?.substringBefore("@")
                     ?: "Kingdom User"
 
-                val country = document.getString("country") ?: ""
+                val country = doc.getString("country") ?: ""
 
-                syncPublicProfile(name, country) { success, message ->
-                    if (!success) {
-                        notice(message)
-                    }
+                syncPublicProfile(name, country) { ok, message ->
+                    if (!ok) notice(message)
                 }
             }
             .addOnFailureListener {
@@ -106,14 +103,9 @@ class MainActivity : Activity() {
             "country" to country
         )
 
-        functions
-            .getHttpsCallable("syncPublicProfile")
-            .call(data)
+        functions.getHttpsCallable("syncPublicProfile").call(data)
             .addOnSuccessListener {
-                callback?.invoke(
-                    true,
-                    "Profile synced successfully."
-                )
+                callback?.invoke(true, "Profile synced successfully.")
             }
             .addOnFailureListener { error ->
                 callback?.invoke(
@@ -123,7 +115,7 @@ class MainActivity : Activity() {
             }
     }
 
-    // NAVIGATION
+    // APP SHELL / NAVIGATION
 
     private fun showTab(tab: String) {
         currentTab = tab
@@ -137,339 +129,656 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun createTabLayout(): Pair<LinearLayout, LinearLayout> {
+    private fun appRoot(): Pair<LinearLayout, LinearLayout> {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(bg)
         }
 
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(18), dp(18), dp(18))
-        }
-
         val scroll = ScrollView(this).apply {
             isFillViewport = true
-            addView(content)
         }
 
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(12), dp(16), dp(18))
+        }
+
+        scroll.addView(content)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(bottomNavigation())
 
-        return Pair(root, content)
+        return root to content
     }
 
     private fun bottomNavigation(): LinearLayout {
         val nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(dp(5), dp(8), dp(5), dp(8))
-            setBackgroundColor(Color.rgb(17, 23, 48))
+            setPadding(dp(7), dp(7), dp(7), dp(7))
+            background = rounded(
+                intArrayOf(
+                    Color.rgb(8, 15, 54),
+                    Color.rgb(13, 25, 75)
+                ),
+                28,
+                cyan,
+                1
+            )
         }
 
-        val items = listOf(
+        listOf(
             "⌂" to "Home",
             "🎙" to "Rooms",
             "✉" to "Messages",
             "♙" to "Profile"
-        )
+        ).forEach { item ->
 
-        items.forEach { item ->
-            val selected = currentTab == item.second
+            val active = currentTab == item.second
 
-            val itemView = LinearLayout(this).apply {
+            val cell = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
+                setPadding(dp(4), dp(7), dp(4), dp(7))
+
+                if (active) {
+                    background = rounded(
+                        intArrayOf(
+                            Color.rgb(8, 95, 190),
+                            Color.rgb(13, 35, 105)
+                        ),
+                        22,
+                        cyan,
+                        1
+                    )
+                }
+
                 isClickable = true
-                isFocusable = true
                 setOnClickListener {
                     showTab(item.second)
                 }
             }
 
-            itemView.addView(
-                text(item.first, 22f, if (selected) cyan else muted, true)
+            cell.addView(
+                text(
+                    item.first,
+                    24f,
+                    if (active) cyan else muted,
+                    true
+                )
             )
-            itemView.addView(
-                text(item.second, 11f, if (selected) cyan else muted, selected)
+
+            cell.addView(
+                text(
+                    item.second,
+                    11f,
+                    if (active) cyan else muted,
+                    true
+                )
             )
 
             nav.addView(
-                itemView,
-                LinearLayout.LayoutParams(0, dp(55), 1f)
+                cell,
+                LinearLayout.LayoutParams(0, dp(62), 1f)
             )
         }
 
         return nav
     }
 
-    // HOME
+    // HOME SCREEN
 
     private fun showHome() {
-        val (root, content) = createTabLayout()
+        val (root, content) = appRoot()
 
-        content.addView(text("♛ KINGDOM VOICE CHAT", 23f, white, true))
-        content.addView(text("VOICE • CHAT • CONNECT", 11f, cyan, true))
+        addTopHeader(content, true)
 
-        val hero = LinearLayout(this).apply {
+        val banner = neonCard().apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(18), dp(14), dp(18))
+        }
+
+        banner.addView(text("🎙", 48f, cyan, true))
+
+        val copy = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(22), dp(20), dp(22))
-            background = gradient(
-                intArrayOf(
-                    Color.rgb(48, 43, 120),
-                    Color.rgb(15, 105, 130)
-                )
-            )
+            setPadding(dp(10), 0, 0, 0)
         }
 
-        hero.addView(text("YOUR WORLD. YOUR VOICE.", 12f, cyan, true))
-        hero.addView(
-            text("Find your people.", 28f, white, true).apply {
-                setPadding(0, dp(12), 0, dp(8))
-            }
-        )
-        hero.addView(
-            text(
-                "Join rooms, meet friends and share your voice.",
-                14f,
-                white
-            )
-        )
-        hero.addView(
-            button("Explore Voice Rooms") {
-                showTab("Rooms")
+        copy.addView(text("Welcome to", 18f, white, true))
+        copy.addView(text("Kingdom Voice Chat", 23f, cyan, true))
+        copy.addView(text("Sing • Chat • Make Friends", 12f, white))
+
+        banner.addView(copy)
+        banner.addView(text("👑", 42f, Color.YELLOW, true))
+
+        content.addView(banner, matchWrap(top = 12))
+
+        section(content, "🔥  Live Rooms", "See All") {
+            showTab("Rooms")
+        }
+
+        val live = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+
+        live.addView(
+            roomMiniCard(
+                "Music Forever",
+                "Saba Melody",
+                "505",
+                "23.5K",
+                "🎵"
+            ) {
+                enterRoom("505")
             },
-            LinearLayout.LayoutParams(-1, dp(50)).apply {
-                topMargin = dp(18)
+            weighted()
+        )
+
+        live.addView(
+            roomMiniCard(
+                "Sing Together",
+                "Sameer ZS",
+                "821",
+                "18.7K",
+                "🎤"
+            ) {
+                enterRoom("821")
+            },
+            weighted()
+        )
+
+        live.addView(
+            roomMiniCard(
+                "Fun & Chat",
+                "Zeba Sameer",
+                "505",
+                "12.9K",
+                "💬"
+            ) {
+                enterRoom("505")
+            },
+            weighted()
+        )
+
+        content.addView(live, matchWrap(top = 8))
+
+        section(content, "⭐  Popular Rooms", "See All") {
+            showTab("Rooms")
+        }
+
+        val popular = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+
+        listOf(
+            Triple("Star Singer Club", "8.2K Online", "🎙"),
+            Triple("Royal Family", "6.7K Online", "👑"),
+            Triple("Music Mania", "5.9K Online", "🎶")
+        ).forEach { item ->
+            popular.addView(
+                popularCard(
+                    item.first,
+                    item.second,
+                    item.third
+                ) {
+                    showTab("Rooms")
+                },
+                weighted()
+            )
+        }
+
+        content.addView(popular, matchWrap(top = 8))
+
+        val rewards = neonCard().apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(15), dp(14), dp(15))
+        }
+
+        rewards.addView(text("🎁", 42f, Color.YELLOW, true))
+
+        val rewardText = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), 0, dp(8), 0)
+        }
+
+        rewardText.addView(
+            text("Daily Rewards", 19f, Color.YELLOW, true)
+        )
+
+        rewardText.addView(
+            text("Login daily & get free coins!", 12f, white)
+        )
+
+        rewards.addView(
+            rewardText,
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+
+        rewards.addView(
+            button("Claim Now") {
+                notice(
+                    "Daily rewards will be available when rewards service is connected."
+                )
             }
         )
 
-        content.addView(
-            hero,
-            LinearLayout.LayoutParams(-1, -2).apply {
-                topMargin = dp(22)
-            }
-        )
-
-        section(content, "Discover")
-
-        addRow(content, "👑", "Official Rooms", "Explore official voice rooms") {
-            showTab("Rooms")
-        }
-        addRow(content, "🎙", "Normal Rooms", "Discover public rooms") {
-            showTab("Rooms")
-        }
-        addRow(content, "💬", "Messages", "Connect with other users") {
-            showTab("Messages")
-        }
-        addRow(content, "💎", "My Wallet", "View Coins and Pearls") {
-            showWallet()
-        }
+        content.addView(rewards, matchWrap(top = 18))
 
         setContentView(root)
     }
 
-    // ROOMS
+    // ROOMS SCREEN
 
     private fun showRooms() {
-        val (root, content) = createTabLayout()
+        val (root, content) = appRoot()
 
-        content.addView(text("Explore Rooms", 25f, white, true))
-        content.addView(
-            text("Join a voice room using its Room ID.", 13f, muted)
-        )
-
-        section(content, "Room Categories")
-
-        addRow(content, "👑", "Official Rooms", "Kingdom official rooms") {
-            enterRoom()
-        }
-        addRow(content, "🎙", "Public Rooms", "Join a public room") {
-            enterRoom()
-        }
+        addTopHeader(content, true)
 
         content.addView(
-            button("Enter Room ID") {
-                enterRoom()
-            },
-            LinearLayout.LayoutParams(-1, dp(52)).apply {
-                topMargin = dp(18)
-            }
+            neonBanner(
+                "🎙",
+                "Join Amazing",
+                "Voice Rooms",
+                "Sing • Chat • Make Friends"
+            ),
+            matchWrap(top = 10)
         )
 
-        setContentView(root)
-    }
-
-    private fun enterRoom() {
-        val input = EditText(this).apply {
-            hint = "Enter Room ID"
-            setTextColor(white)
-            setHintTextColor(muted)
-            setPadding(dp(12), dp(12), dp(12), dp(12))
+        val filters = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
         }
 
-        AlertDialog.Builder(this)
-            .setTitle("Join Voice Room")
-            .setView(input)
-            .setNegativeButton("Cancel", null)
-            .setPositiveButton("Join") { _, _ ->
-                val roomId = input.text.toString().trim()
-
-                if (roomId.isBlank()) {
-                    notice("Please enter Room ID")
-                    return@setPositiveButton
-                }
-
-                val intent = Intent(this, RoomActivity::class.java)
-                intent.putExtra("roomID", roomId)
-                startActivity(intent)
-            }
-            .show()
-    }
-
-    // MESSAGES
-
-    private fun showMessages() {
-        val (root, content) = createTabLayout()
-
-        content.addView(text("Messages", 25f, white, true))
-        content.addView(text("Connect with Kingdom users.", 13f, muted))
-
-        section(content, "Communication")
-
-        addRow(content, "👥", "People", "Find registered users") {
-            showPeople()
-        }
-        addRow(content, "💬", "Chats", "Your conversations") {
-            showSimpleScreen(
-                "Chats",
-                "Chat conversations will appear here when the messaging backend is connected."
+        listOf(
+            "All Rooms",
+            "Singing",
+            "Gaming",
+            "Fun",
+            "Quiz"
+        ).forEachIndexed { index, label ->
+            filters.addView(
+                chip(label, index == 0) {
+                    notice("$label rooms selected")
+                },
+                weighted()
             )
         }
-        addRow(content, "🎙", "Voice Rooms", "Talk with people") {
-            showTab("Rooms")
-        }
 
-        setContentView(root)
-    }
+        content.addView(filters, matchWrap(top = 12))
 
-    private fun showPeople() {
-        currentFeature = "People"
+        val grid = listOf(
+            Triple("Music Lovers Club", "Sing & Enjoy Together", "505"),
+            Triple("Gaming Zone", "Play • Chat • Fun", "821"),
+            Triple("Fun Time Club", "Laugh • Chat • Chill", "505"),
+            Triple("Quiz Challenge", "Test Your Knowledge", "821"),
+            Triple("Music Mania", "Best Songs & Vibes", "505"),
+            Triple("StarLeo Concert", "Sing Like a Star", "821")
+        )
 
-        val root = page("People")
-        val content = root.tag as LinearLayout
+        grid.chunked(2).forEach { pair ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+            }
 
-        val list = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-
-        content.addView(list)
-        setContentView(root)
-        list.addView(text("Loading users...", 14f, muted))
-
-        db.collection("publicProfiles")
-            .limit(50)
-            .get()
-            .addOnSuccessListener { result ->
-                list.removeAllViews()
-
-                if (result.isEmpty) {
-                    list.addView(text("No users found.", 14f, muted))
-                    return@addOnSuccessListener
-                }
-
-                result.documents.forEach { document ->
-                    val name = document.getString("name") ?: "Kingdom User"
-                    val country = document.getString("country") ?: ""
-                    val uid = document.id
-                    val numericId = document.getLong("numericId") ?: 0L
-
-                    addRow(
-                        list,
-                        "👤",
-                        name,
-                        "$country • ID: $numericId"
+            pair.forEach { item ->
+                row.addView(
+                    roomLargeCard(
+                        item.first,
+                        item.second,
+                        item.third
                     ) {
-                        showUserDetails(uid, name, country)
-                    }
-                }
+                        enterRoom(item.third)
+                    },
+                    weighted()
+                )
             }
-            .addOnFailureListener {
-                list.removeAllViews()
-                list.addView(text("Unable to load users.", 14f, muted))
-                notice(it.localizedMessage ?: "Unable to load users")
+
+            if (pair.size == 1) {
+                row.addView(View(this), weighted())
             }
+
+            content.addView(row, matchWrap(top = 10))
+        }
+
+        setContentView(root)
     }
 
-    private fun showUserDetails(uid: String, name: String, country: String) {
-        AlertDialog.Builder(this)
-            .setTitle(name)
-            .setMessage("Country: $country\nUser UID:\n$uid")
-            .setPositiveButton("OK", null)
-            .show()
+    // MESSAGES SCREEN
+
+    private fun showMessages() {
+        val (root, content) = appRoot()
+
+        addTopHeader(content, true)
+
+        content.addView(
+            neonBanner(
+                "💬",
+                "Stay Connected",
+                "Chat & Messages",
+                "Make Friends • Share Moments"
+            ),
+            matchWrap(top = 10)
+        )
+
+        val tabs = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+
+        listOf(
+            "All Chats",
+            "Friends",
+            "Groups",
+            "System"
+        ).forEachIndexed { i, label ->
+            tabs.addView(
+                chip(label, i == 0) {
+                    notice("$label selected")
+                },
+                weighted()
+            )
+        }
+
+        content.addView(tabs, matchWrap(top = 12))
+
+        val search = EditText(this).apply {
+            hint = "⌕  Search chats, users, or room..."
+            setTextColor(white)
+            setHintTextColor(muted)
+            textSize = 14f
+            setPadding(dp(15), dp(12), dp(15), dp(12))
+            background = rounded(
+                intArrayOf(
+                    Color.rgb(10, 22, 72),
+                    Color.rgb(14, 28, 82)
+                ),
+                24,
+                Color.rgb(46, 75, 150),
+                1
+            )
+        }
+
+        content.addView(search, matchWrap(top = 12))
+
+        val chats = listOf(
+            Triple("King Sameer", "Hello bro! How are you?", "👑"),
+            Triple("Saba Melody", "Thank you for joining the room ❤️", "🎤"),
+            Triple("Room 821 Family", "Zeba Ansari: Good night everyone 🌙", "👥"),
+            Triple("Peter", "Bro, tomorrow live concert hai 👍", "🧑"),
+            Triple("Zeba Sameer Siddiqui", "Voice message (0:32)", "👑"),
+            Triple("Official Events", "New Event: One Day Singing Competition 🎉", "📢"),
+            Triple("Riya Khan", "Hahaha! Nice voice 😊", "👩"),
+            Triple("StarLeo Clan", "Welcome to StarLeo Concert House 821", "🦁")
+        )
+
+        chats.forEachIndexed { index, chat ->
+            addChatRow(
+                content,
+                chat.first,
+                chat.second,
+                chat.third,
+                if (index == 0 || index == 1) "1" else ""
+            ) {
+                showSimpleScreen(
+                    chat.first,
+                    "Conversation UI will appear here after the chat backend is connected."
+                )
+            }
+        }
+
+        setContentView(root)
     }
 
-    // PROFILE MENU
+    // PROFILE SCREEN
 
     private fun showProfileMenu() {
-        val (root, content) = createTabLayout()
+        val (root, content) = appRoot()
+        addTopHeader(content, true)
+
         val user = auth.currentUser
 
-        content.addView(text("My Profile", 25f, white, true))
-
-        val profileCard = LinearLayout(this).apply {
+        val profile = neonCard().apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(20), dp(22), dp(20), dp(22))
-            background = cardBackground()
+            setPadding(dp(16), dp(18), dp(16), dp(18))
         }
 
-        val image = ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(90), dp(90))
+        val identity = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val avatar = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(94), dp(94))
             scaleType = ImageView.ScaleType.CENTER_CROP
             background = circleBackground()
             clipToOutline = true
         }
 
-        loadProfileImage(image)
-        profileCard.addView(image)
+        loadProfileImage(avatar)
+        identity.addView(avatar)
 
-        profileCard.addView(
-            text(user?.email ?: "Kingdom User", 18f, white, true).apply {
-                setPadding(0, dp(12), 0, dp(5))
-            }
+        val details = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(13), 0, 0, 0)
+        }
+
+        details.addView(
+            text(
+                user?.email?.substringBefore("@") ?: "Kingdom User",
+                20f,
+                white,
+                true
+            )
         )
-        profileCard.addView(text("UID: ${user?.uid ?: "-"}", 11f, muted))
+
+        details.addView(
+            text(
+                "✔  ID: ${user?.uid?.take(8) ?: "—"}",
+                13f,
+                cyan,
+                true
+            )
+        )
+
+        details.addView(
+            text("⭐  Lv.1      ▰▰▰▱  68%", 13f, Color.MAGENTA, true)
+        )
+
+        details.addView(
+            text("📍 Pakistan  •  ♂ Male", 12f, muted)
+        )
+
+        identity.addView(
+            details,
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+
+        profile.addView(identity)
+        content.addView(profile, matchWrap(top = 12))
+
+        val stats = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            background = rounded(
+                intArrayOf(
+                    Color.rgb(9, 18, 60),
+                    Color.rgb(18, 29, 82)
+                ),
+                22,
+                Color.rgb(42, 66, 135),
+                1
+            )
+            setPadding(dp(5), dp(14), dp(5), dp(14))
+        }
+
+        listOf(
+            "👥" to "Followers",
+            "🫂" to "Following",
+            "🎁" to "Gifts",
+            "💎" to "Coins"
+        ).forEach { item ->
+
+            val cell = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+            }
+
+            cell.addView(text(item.first, 23f, cyan, true))
+            cell.addView(text("0", 17f, white, true))
+            cell.addView(text(item.second, 10f, muted))
+
+            stats.addView(
+                cell,
+                LinearLayout.LayoutParams(0, -2, 1f)
+            )
+        }
+
+        content.addView(stats, matchWrap(top = 12))
 
         content.addView(
-            profileCard,
-            LinearLayout.LayoutParams(-1, -2).apply {
-                topMargin = dp(18)
-            }
+            button("✎   Edit Profile") {
+                showProfile()
+            },
+            matchWrap(top = 12)
         )
 
-        section(content, "Account")
-
-        addRow(content, "✏", "Edit Profile", "Update your profile") {
-            showProfile()
-        }
-        addRow(content, "💎", "Wallet", "Coins and Pearls") {
+        addProfileOption(
+            content,
+            "👛",
+            "Wallet",
+            "Your Coins & Balance"
+        ) {
             showWallet()
         }
-        addRow(content, "🎁", "Gift Store", "View available gifts") {
-            showGiftStore()
+
+        addProfileOption(
+            content,
+            "🎁",
+            "Gifts Received",
+            "Your Received Gifts"
+        ) {
+            showSimpleScreen(
+                "Gifts Received",
+                "Your received gifts will appear here when connected."
+            )
         }
-        addRow(content, "⚙", "Settings", "Account settings") {
+
+        addProfileOption(
+            content,
+            "👑",
+            "Levels",
+            "Your Growth & Rank"
+        ) {
+            showSimpleScreen(
+                "Levels",
+                "Your level and rank information will appear here."
+            )
+        }
+
+        addProfileOption(
+            content,
+            "💬",
+            "Message Requests",
+            "New Messages"
+        ) {
+            showTab("Messages")
+        }
+
+        addProfileOption(
+            content,
+            "👥",
+            "My Followers",
+            "People Who Follow You"
+        ) {
+            showPeople()
+        }
+
+        addProfileOption(
+            content,
+            "⚙",
+            "Settings",
+            "App Preferences"
+        ) {
             showAccountSettings()
         }
-        addRow(content, "🚪", "Sign Out", "Sign out of your account") {
+
+        addProfileOption(
+            content,
+            "ℹ",
+            "About Kingdom Voice Chat",
+            "Version 1.0.0"
+        ) {
+            showSimpleScreen(
+                "About Kingdom Voice Chat",
+                "Kingdom Voice Chat • Version 1.0.0"
+            )
+        }
+
+        addProfileOption(
+            content,
+            "🚪",
+            "Sign Out",
+            "Sign out of your account"
+        ) {
             confirmSignOut()
         }
 
         setContentView(root)
     }
 
-    // PROFILE EDITING
+    private fun addTopHeader(
+        parent: LinearLayout,
+        actions: Boolean
+    ) {
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        header.addView(text("👑", 35f, Color.YELLOW, true))
+
+        val brand = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(7), 0, 0, 0)
+        }
+
+        brand.addView(text("Kingdom", 23f, white, true))
+        brand.addView(text("Voice Chat", 15f, cyan, true))
+
+        header.addView(
+            brand,
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+
+        if (actions) {
+            header.addView(
+                text("⌕", 30f, white, true).apply {
+                    setPadding(dp(8), 0, dp(8), 0)
+                    setOnClickListener { showPeople() }
+                }
+            )
+
+            header.addView(
+                text("♧", 27f, white, true).apply {
+                    setPadding(dp(8), 0, dp(8), 0)
+                    setOnClickListener {
+                        notice("No new notifications")
+                    }
+                }
+            )
+
+            header.addView(
+                text("⚙", 27f, white, true).apply {
+                    setPadding(dp(8), 0, 0, 0)
+                    setOnClickListener { showAccountSettings() }
+                }
+            )
+        }
+
+        parent.addView(header)
+    }
+
+    // PROFILE EDITOR
 
     private fun showProfile() {
         currentFeature = "Edit Profile"
@@ -493,9 +802,12 @@ class MainActivity : Activity() {
             }
         )
 
-        content.addView(button("Change Profile Photo") {
-            choosePhoto()
-        })
+        content.addView(
+            button("Change Profile Photo") {
+                choosePhoto()
+            },
+            matchWrap(top = 10)
+        )
 
         profileName = inputField("Your Name")
         profileCountry = inputField("Country")
@@ -512,12 +824,17 @@ class MainActivity : Activity() {
         lateinit var genderButton: TextView
 
         genderButton = button("Select Gender: $selectedGender") {
-            val genders = arrayOf("Male", "Female", "Other", "Not specified")
+            val options = arrayOf(
+                "Male",
+                "Female",
+                "Other",
+                "Not specified"
+            )
 
             AlertDialog.Builder(this)
                 .setTitle("Select Gender")
-                .setItems(genders) { _, which ->
-                    selectedGender = genders[which]
+                .setItems(options) { _, which ->
+                    selectedGender = options[which]
                     genderButton.text = "Select Gender: $selectedGender"
                 }
                 .show()
@@ -525,99 +842,96 @@ class MainActivity : Activity() {
 
         content.addView(genderButton)
 
-        val saveButton = button("Save Profile") {
-
-            val name = profileName.text.toString().trim()
-            val country = profileCountry.text.toString().trim()
-            val ageText = profileAge.text.toString().trim()
-
-            if (name.isBlank()) {
-                notice("Please enter your name")
-                return@button
-            }
-
-            if (name.length > 40) {
-                notice("Name must be 40 characters or less")
-                return@button
-            }
-
-            if (country.length > 60) {
-                notice("Country must be 60 characters or less")
-                return@button
-            }
-
-            val age = if (ageText.isBlank()) {
-                null
-            } else {
-                ageText.toIntOrNull()
-            }
-
-            if (ageText.isNotBlank() && (age == null || age !in 1..120)) {
-                notice("Enter a valid age")
-                return@button
-            }
-
-            val user = auth.currentUser ?: return@button
-
-            // Public profile sync through trusted Cloud Function.
-            syncPublicProfile(name, country) { success, message ->
-
-                if (!success) {
-                    notice(message)
-                    return@syncPublicProfile
-                }
-
-                // Keep age and gender private in users collection.
-                val privateData = hashMapOf<String, Any>(
-                    "name" to name,
-                    "country" to country,
-                    "gender" to selectedGender,
-                    "updatedAt" to FieldValue.serverTimestamp()
-                )
-
-                if (age != null) {
-                    privateData["age"] = age
-                }
-
-                db.collection("users")
-                    .document(user.uid)
-                    .set(privateData, SetOptions.merge())
-                    .addOnSuccessListener {
-                        notice(message)
-                        currentFeature = null
-                        showProfileMenu()
-                    }
-                    .addOnFailureListener {
-                        notice(
-                            it.localizedMessage ?: "Private profile save failed"
-                        )
-                    }
-            }
-        }
-
         content.addView(
-            saveButton,
-            LinearLayout.LayoutParams(-1, dp(52)).apply {
-                topMargin = dp(20)
-            }
+            button("Save Profile") {
+
+                val name = profileName.text.toString().trim()
+                val country = profileCountry.text.toString().trim()
+                val ageText = profileAge.text.toString().trim()
+
+                if (name.isBlank()) {
+                    notice("Please enter your name")
+                    return@button
+                }
+
+                if (name.length > 40) {
+                    notice("Name must be 40 characters or less")
+                    return@button
+                }
+
+                if (country.length > 60) {
+                    notice("Country must be 60 characters or less")
+                    return@button
+                }
+
+                val age = if (ageText.isBlank()) {
+                    null
+                } else {
+                    ageText.toIntOrNull()
+                }
+
+                if (ageText.isNotBlank() && (age == null || age !in 1..120)) {
+                    notice("Enter a valid age")
+                    return@button
+                }
+
+                val user = auth.currentUser ?: return@button
+
+                syncPublicProfile(name, country) { success, message ->
+
+                    if (!success) {
+                        notice(message)
+                        return@syncPublicProfile
+                    }
+
+                    val privateData = hashMapOf<String, Any>(
+                        "name" to name,
+                        "country" to country,
+                        "gender" to selectedGender,
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+
+                    if (age != null) {
+                        privateData["age"] = age
+                    }
+
+                    db.collection("users")
+                        .document(user.uid)
+                        .set(privateData, SetOptions.merge())
+                        .addOnSuccessListener {
+                            notice(message)
+                            currentFeature = null
+                            showProfileMenu()
+                        }
+                        .addOnFailureListener {
+                            notice(
+                                it.localizedMessage
+                                    ?: "Private profile save failed"
+                            )
+                        }
+                }
+            },
+            matchWrap(top = 18)
         )
 
         setContentView(root)
 
         auth.currentUser?.let { user ->
-            db.collection("users").document(user.uid).get()
-                .addOnSuccessListener { document ->
+            db.collection("users")
+                .document(user.uid)
+                .get()
+                .addOnSuccessListener { doc ->
 
                     if (isFinishing || isDestroyed) {
                         return@addOnSuccessListener
                     }
 
-                    profileName.setText(document.getString("name") ?: "")
-                    profileCountry.setText(document.getString("country") ?: "")
-                    profileAge.setText(document.get("age")?.toString() ?: "")
+                    profileName.setText(doc.getString("name") ?: "")
+                    profileCountry.setText(doc.getString("country") ?: "")
+                    profileAge.setText(doc.get("age")?.toString() ?: "")
 
                     selectedGender =
-                        document.getString("gender") ?: "Not specified"
+                        doc.getString("gender") ?: "Not specified"
 
                     genderButton.text = "Select Gender: $selectedGender"
                 }
@@ -633,8 +947,10 @@ class MainActivity : Activity() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             type = "image/*"
             addCategory(Intent.CATEGORY_OPENABLE)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+            )
         }
 
         startActivityForResult(intent, PHOTO_REQUEST)
@@ -659,7 +975,9 @@ class MainActivity : Activity() {
             } catch (_: Exception) {
             }
 
-            prefs.edit().putString("profile_photo", uri.toString()).apply()
+            prefs.edit()
+                .putString("profile_photo", uri.toString())
+                .apply()
 
             if (::profileImage.isInitialized) {
                 profileImage.setImageURI(uri)
@@ -683,7 +1001,7 @@ class MainActivity : Activity() {
         }
     }
 
-    // WALLET
+    // WALLET / GIFTS
 
     private fun showWallet() {
         currentFeature = "Wallet"
@@ -691,24 +1009,22 @@ class MainActivity : Activity() {
         val root = page("My Wallet")
         val content = root.tag as LinearLayout
 
-        val balanceText = text("Loading wallet...", 20f, cyan, true)
+        val balance = text("Loading wallet...", 22f, cyan, true)
+
+        content.addView(balance, matchWrap(top = 20))
 
         content.addView(
-            balanceText,
-            LinearLayout.LayoutParams(-1, dp(90))
+            button("Refresh Balance") {
+                loadWallet(balance)
+            },
+            matchWrap(top = 12)
         )
-
-        content.addView(button("Refresh Balance") {
-            loadWallet(balanceText)
-        })
 
         content.addView(
             button("Open Gift Store") {
                 showGiftStore()
             },
-            LinearLayout.LayoutParams(-1, dp(52)).apply {
-                topMargin = dp(15)
-            }
+            matchWrap(top = 12)
         )
 
         content.addView(
@@ -716,19 +1032,18 @@ class MainActivity : Activity() {
                 "Wallet balance is provided by the Kingdom Wallet API.",
                 12f,
                 muted
-            ).apply {
-                setPadding(0, dp(15), 0, 0)
-            }
+            )
         )
 
         setContentView(root)
-        loadWallet(balanceText)
+        loadWallet(balance)
     }
 
     private fun loadWallet(target: TextView) {
         target.text = "Loading wallet..."
 
         WalletApi.getWallet(object : WalletApi.Callback<WalletBalance> {
+
             override fun onSuccess(value: WalletBalance) {
                 runOnUiThread {
                     if (!isFinishing && !isDestroyed) {
@@ -749,15 +1064,13 @@ class MainActivity : Activity() {
         })
     }
 
-    // GIFT STORE
-
     private fun showGiftStore() {
         currentFeature = "Gift Store"
 
         val root = page("Gift Store")
         val content = root.tag as LinearLayout
 
-        content.addView(text("Available gifts", 14f, muted))
+        content.addView(text("Available gifts", 15f, muted))
 
         val list = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -769,19 +1082,25 @@ class MainActivity : Activity() {
         list.addView(text("Loading gifts...", 14f, muted))
 
         WalletApi.getGifts(object : WalletApi.Callback<List<GiftItem>> {
+
             override fun onSuccess(value: List<GiftItem>) {
                 runOnUiThread {
-                    if (isFinishing || isDestroyed) return@runOnUiThread
+
+                    if (isFinishing || isDestroyed) {
+                        return@runOnUiThread
+                    }
 
                     list.removeAllViews()
 
                     if (value.isEmpty()) {
-                        list.addView(text("No gifts available.", 14f, muted))
+                        list.addView(
+                            text("No gifts available.", 14f, muted)
+                        )
                         return@runOnUiThread
                     }
 
                     value.forEach { gift ->
-                        addRow(
+                        addProfileOption(
                             list,
                             "🎁",
                             gift.name,
@@ -795,9 +1114,15 @@ class MainActivity : Activity() {
 
             override fun onError(message: String) {
                 runOnUiThread {
-                    if (isFinishing || isDestroyed) return@runOnUiThread
+
+                    if (isFinishing || isDestroyed) {
+                        return@runOnUiThread
+                    }
+
                     list.removeAllViews()
-                    list.addView(text("Unable to load gifts.", 14f, muted))
+                    list.addView(
+                        text("Unable to load gifts.", 14f, muted)
+                    )
                     notice(message)
                 }
             }
@@ -810,20 +1135,20 @@ class MainActivity : Activity() {
             setPadding(dp(18), dp(8), dp(18), dp(8))
         }
 
-        val receiverInput = EditText(this).apply {
+        val receiver = EditText(this).apply {
             hint = "Receiver Firebase UID"
             setTextColor(white)
             setHintTextColor(muted)
         }
 
-        val roomInput = EditText(this).apply {
+        val room = EditText(this).apply {
             hint = "Room ID"
             setTextColor(white)
             setHintTextColor(muted)
         }
 
-        box.addView(receiverInput)
-        box.addView(roomInput)
+        box.addView(receiver)
+        box.addView(room)
 
         AlertDialog.Builder(this)
             .setTitle("Send ${gift.name}")
@@ -832,19 +1157,20 @@ class MainActivity : Activity() {
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Send Gift") { _, _ ->
 
-                val receiver = receiverInput.text.toString().trim()
-                val roomId = roomInput.text.toString().trim()
+                val uid = receiver.text.toString().trim()
+                val roomId = room.text.toString().trim()
 
-                if (receiver.isBlank() || roomId.isBlank()) {
+                if (uid.isBlank() || roomId.isBlank()) {
                     notice("Enter receiver UID and Room ID")
                     return@setPositiveButton
                 }
 
                 WalletApi.sendGift(
-                    receiver,
+                    uid,
                     gift.id,
                     roomId,
                     object : WalletApi.Callback<org.json.JSONObject> {
+
                         override fun onSuccess(value: org.json.JSONObject) {
                             runOnUiThread {
                                 notice("Gift sent successfully")
@@ -863,7 +1189,7 @@ class MainActivity : Activity() {
             .show()
     }
 
-    // SETTINGS
+    // SETTINGS / SIGN OUT
 
     private fun showAccountSettings() {
         currentFeature = "Settings"
@@ -871,15 +1197,30 @@ class MainActivity : Activity() {
         val root = page("Settings")
         val content = root.tag as LinearLayout
 
-        addRow(content, "🎨", "Theme Settings", "Change app appearance") {
+        addProfileOption(
+            content,
+            "🎨",
+            "Theme Settings",
+            "Change app appearance"
+        ) {
             startActivity(Intent(this, ThemeSettingsActivity::class.java))
         }
 
-        addRow(content, "👑", "Owner Panel", "Open owner controls") {
+        addProfileOption(
+            content,
+            "👑",
+            "Owner Panel",
+            "Open owner controls"
+        ) {
             startActivity(Intent(this, OwnerPanelActivity::class.java))
         }
 
-        addRow(content, "🚪", "Sign Out", "Sign out of your account") {
+        addProfileOption(
+            content,
+            "🚪",
+            "Sign Out",
+            "Sign out of your account"
+        ) {
             confirmSignOut()
         }
 
@@ -895,59 +1236,82 @@ class MainActivity : Activity() {
 
                 auth.signOut()
 
-                val intent = Intent(this, AuthActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_CLEAR_TASK
-                }
+                startActivity(
+                    Intent(this, AuthActivity::class.java).apply {
+                        flags =
+                            Intent.FLAG_ACTIVITY_NEW_TASK or
+                                Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    }
+                )
 
-                startActivity(intent)
                 finish()
             }
             .show()
     }
 
-    // BASIC SCREEN HELPERS
+    // PEOPLE / GENERIC PAGES
 
-    private fun page(title: String): LinearLayout {
-        val root = LinearLayout(this).apply {
+    private fun showPeople() {
+        currentFeature = "People"
+
+        val root = page("People")
+        val content = root.tag as LinearLayout
+
+        val list = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(18), dp(18), dp(18))
-            setBackgroundColor(bg)
         }
 
-        val header = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
+        content.addView(list)
+        setContentView(root)
 
-        val back = text("‹", 32f, cyan, true)
-        back.setOnClickListener {
-            currentFeature = null
-            showTab(currentTab)
-        }
+        list.addView(text("Loading users...", 14f, muted))
 
-        header.addView(back)
-        header.addView(
-            text(title, 22f, white, true).apply {
-                setPadding(dp(12), 0, 0, 0)
+        db.collection("publicProfiles")
+            .limit(50)
+            .get()
+            .addOnSuccessListener { result ->
+
+                list.removeAllViews()
+
+                if (result.isEmpty) {
+                    list.addView(text("No users found.", 14f, muted))
+                    return@addOnSuccessListener
+                }
+
+                result.documents.forEach { doc ->
+                    val name = doc.getString("name") ?: "Kingdom User"
+                    val country = doc.getString("country") ?: ""
+                    val id = doc.getLong("numericId") ?: 0L
+
+                    addProfileOption(
+                        list,
+                        "👤",
+                        name,
+                        "$country • ID: $id"
+                    ) {
+                        showUserDetails(doc.id, name, country)
+                    }
+                }
             }
-        )
+            .addOnFailureListener {
+                list.removeAllViews()
+                list.addView(
+                    text("Unable to load users.", 14f, muted)
+                )
+                notice(it.localizedMessage ?: "Unable to load users")
+            }
+    }
 
-        root.addView(header)
-
-        val scroll = ScrollView(this).apply {
-            isFillViewport = true
-        }
-
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-
-        scroll.addView(content)
-        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-
-        root.tag = content
-        return root
+    private fun showUserDetails(
+        uid: String,
+        name: String,
+        country: String
+    ) {
+        AlertDialog.Builder(this)
+            .setTitle(name)
+            .setMessage("Country: $country\nUser UID:\n$uid")
+            .setPositiveButton("OK", null)
+            .show()
     }
 
     private fun showSimpleScreen(title: String, message: String) {
@@ -965,32 +1329,244 @@ class MainActivity : Activity() {
         setContentView(root)
     }
 
-    private fun section(parent: LinearLayout, title: String) {
-        parent.addView(
-            text(title, 19f, white, true).apply {
-                setPadding(0, dp(22), 0, dp(10))
+    // REUSABLE VISUAL COMPONENTS
+
+    private fun page(title: String): LinearLayout {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(14), dp(16), dp(16))
+            setBackgroundColor(bg)
+        }
+
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        header.addView(
+            text("‹", 34f, cyan, true).apply {
+                setOnClickListener {
+                    currentFeature = null
+                    showTab(currentTab)
+                }
             }
         )
+
+        header.addView(
+            text(title, 22f, white, true).apply {
+                setPadding(dp(12), 0, 0, 0)
+            }
+        )
+
+        root.addView(header)
+
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+        }
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        scroll.addView(content)
+        root.addView(
+            scroll,
+            LinearLayout.LayoutParams(-1, 0, 1f)
+        )
+
+        root.tag = content
+        return root
     }
 
-    private fun addRow(
+    private fun section(
+        parent: LinearLayout,
+        title: String,
+        actionTitle: String? = null,
+        action: (() -> Unit)? = null
+    ) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(18), 0, dp(6))
+        }
+
+        row.addView(
+            text(title, 19f, white, true),
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+
+        if (actionTitle != null) {
+            row.addView(
+                text("$actionTitle  ➜", 13f, cyan, true).apply {
+                    setOnClickListener {
+                        action?.invoke()
+                    }
+                }
+            )
+        }
+
+        parent.addView(row)
+    }
+
+    private fun roomMiniCard(
+        name: String,
+        host: String,
+        id: String,
+        viewers: String,
+        icon: String,
+        action: () -> Unit
+    ): LinearLayout {
+        val box = neonCard().apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(7), dp(10), dp(7), dp(10))
+            setOnClickListener { action() }
+        }
+
+        box.addView(text("🔴 LIVE", 10f, Color.RED, true))
+        box.addView(text(icon, 34f, cyan, true))
+        box.addView(text(name, 12f, white, true))
+        box.addView(text("👑 $host", 10f, muted))
+        box.addView(text("👥 $viewers", 10f, cyan, true))
+
+        box.addView(
+            button("Join") { action() },
+            matchWrap(top = 7)
+        )
+
+        return box
+    }
+
+    private fun popularCard(
+        name: String,
+        online: String,
+        icon: String,
+        action: () -> Unit
+    ): LinearLayout {
+        val box = neonCard().apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(6), dp(12), dp(6), dp(12))
+            setOnClickListener { action() }
+        }
+
+        box.addView(text(icon, 37f, cyan, true))
+        box.addView(text(name, 12f, white, true))
+        box.addView(text("🔥 $online", 10f, muted))
+
+        box.addView(
+            button("Join") { action() },
+            matchWrap(top = 8)
+        )
+
+        return box
+    }
+
+    private fun roomLargeCard(
+        name: String,
+        subtitle: String,
+        roomId: String,
+        action: () -> Unit
+    ): LinearLayout {
+        val box = neonCard().apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), dp(12), dp(10), dp(12))
+        }
+
+        box.addView(text("🔴 LIVE       👥 Online", 11f, cyan, true))
+
+        box.addView(
+            text(
+                when {
+                    name.contains("Gaming") -> "🎮"
+                    name.contains("Quiz") -> "❓"
+                    name.contains("StarLeo") -> "⭐"
+                    name.contains("Music") -> "🎙"
+                    else -> "😎"
+                },
+                43f,
+                cyan,
+                true
+            ).apply {
+                gravity = Gravity.CENTER
+                setPadding(0, dp(8), 0, dp(8))
+            }
+        )
+
+        box.addView(text("👑 $name", 13f, white, true))
+        box.addView(text(subtitle, 11f, muted))
+
+        box.addView(
+            text("⌂ Room $roomId", 11f, cyan, true).apply {
+                setPadding(0, dp(8), 0, dp(8))
+            }
+        )
+
+        box.addView(button("Join  ›") { action() })
+
+        return box
+    }
+
+    private fun addChatRow(
+        parent: LinearLayout,
+        name: String,
+        message: String,
+        icon: String,
+        unread: String,
+        action: () -> Unit
+    ) {
+        val row = neonCard().apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(10), dp(12), dp(10), dp(12))
+            setOnClickListener { action() }
+        }
+
+        row.addView(text(icon, 35f, cyan, true))
+
+        val labels = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), 0, 0, 0)
+        }
+
+        labels.addView(text(name, 15f, white, true))
+        labels.addView(text(message, 12f, muted))
+
+        row.addView(
+            labels,
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+
+        if (unread.isNotEmpty()) {
+            row.addView(
+                text(unread, 14f, white, true).apply {
+                    background = rounded(
+                        intArrayOf(Color.RED, Color.rgb(210, 20, 60)),
+                        30
+                    )
+                    setPadding(dp(9), dp(5), dp(9), dp(5))
+                }
+            )
+        }
+
+        parent.addView(row, matchWrap(top = 8))
+    }
+
+    private fun addProfileOption(
         parent: LinearLayout,
         icon: String,
         title: String,
         subtitle: String,
         action: () -> Unit
     ) {
-        val row = LinearLayout(this).apply {
+        val row = neonCard().apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(14), dp(14), dp(14), dp(14))
-            background = cardBackground()
-            isClickable = true
-            isFocusable = true
+            setPadding(dp(13), dp(13), dp(13), dp(13))
             setOnClickListener { action() }
         }
 
-        row.addView(text(icon, 25f, cyan, true))
+        row.addView(text(icon, 28f, cyan, true))
 
         val labels = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -1000,20 +1576,112 @@ class MainActivity : Activity() {
         labels.addView(text(title, 15f, white, true))
         labels.addView(text(subtitle, 11f, muted))
 
-        row.addView(labels, LinearLayout.LayoutParams(0, -2, 1f))
-        row.addView(text("›", 24f, muted))
-
-        parent.addView(
-            row,
-            LinearLayout.LayoutParams(-1, -2).apply {
-                bottomMargin = dp(10)
-            }
+        row.addView(
+            labels,
+            LinearLayout.LayoutParams(0, -2, 1f)
         )
+
+        row.addView(text("›", 27f, muted, true))
+
+        parent.addView(row, matchWrap(top = 8))
     }
 
-    private fun label(value: String): TextView {
-        return text(value, 13f, cyan, true).apply {
-            setPadding(0, dp(16), 0, dp(7))
+    private fun neonBanner(
+        icon: String,
+        first: String,
+        second: String,
+        subtitle: String
+    ): LinearLayout {
+        val box = neonCard().apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), dp(14), dp(12), dp(14))
+        }
+
+        box.addView(text(icon, 38f, cyan, true))
+
+        val labels = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), 0, 0, 0)
+        }
+
+        labels.addView(text(first, 16f, white, true))
+        labels.addView(text(second, 23f, cyan, true))
+        labels.addView(text(subtitle, 11f, muted))
+
+        box.addView(labels)
+        box.addView(text("👑", 30f, Color.YELLOW, true))
+
+        return box
+    }
+
+    private fun chip(
+        title: String,
+        selected: Boolean,
+        action: () -> Unit
+    ): TextView {
+        return text(
+            title,
+            10f,
+            if (selected) white else muted,
+            true
+        ).apply {
+            gravity = Gravity.CENTER
+            setPadding(dp(5), dp(11), dp(5), dp(11))
+
+            background = rounded(
+                if (selected) {
+                    intArrayOf(
+                        Color.rgb(0, 150, 230),
+                        Color.rgb(65, 35, 210)
+                    )
+                } else {
+                    intArrayOf(
+                        Color.rgb(12, 20, 65),
+                        Color.rgb(20, 28, 75)
+                    )
+                },
+                24,
+                if (selected) cyan else Color.rgb(48, 66, 130),
+                1
+            )
+
+            setOnClickListener { action() }
+        }
+    }
+
+    private fun neonCard(): LinearLayout {
+        return LinearLayout(this).apply {
+            background = rounded(
+                intArrayOf(
+                    Color.rgb(12, 20, 67),
+                    Color.rgb(24, 24, 83)
+                ),
+                22,
+                Color.rgb(55, 75, 155),
+                1
+            )
+        }
+    }
+
+    private fun button(
+        title: String,
+        action: () -> Unit
+    ): TextView {
+        return text(title, 14f, white, true).apply {
+            gravity = Gravity.CENTER
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+
+            background = rounded(
+                intArrayOf(cyan, blue, purple),
+                28,
+                cyan,
+                1
+            )
+
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { action() }
         }
     }
 
@@ -1024,7 +1692,22 @@ class MainActivity : Activity() {
             setHintTextColor(muted)
             textSize = 15f
             setPadding(dp(13), dp(12), dp(13), dp(12))
-            background = cardBackground()
+
+            background = rounded(
+                intArrayOf(
+                    Color.rgb(12, 20, 65),
+                    Color.rgb(20, 29, 80)
+                ),
+                16,
+                Color.rgb(55, 75, 140),
+                1
+            )
+        }
+    }
+
+    private fun label(value: String): TextView {
+        return text(value, 13f, cyan, true).apply {
+            setPadding(0, dp(14), 0, dp(6))
         }
     }
 
@@ -1038,63 +1721,93 @@ class MainActivity : Activity() {
             text = value
             textSize = size
             setTextColor(color)
-            if (bold) typeface = Typeface.DEFAULT_BOLD
+
+            if (bold) {
+                typeface = Typeface.DEFAULT_BOLD
+            }
         }
     }
 
-    private fun button(
-        title: String,
-        action: () -> Unit
-    ): TextView {
-        return TextView(this).apply {
-            text = title
-            textSize = 14f
-            setTextColor(white)
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            setPadding(dp(15), dp(13), dp(15), dp(13))
-            background = gradient(
-                intArrayOf(
-                    Color.rgb(45, 115, 220),
-                    Color.rgb(120, 70, 220)
-                )
-            )
-            isClickable = true
-            isFocusable = true
-            setOnClickListener { action() }
-        }
-    }
-
-    private fun gradient(colors: IntArray): GradientDrawable {
+    private fun rounded(
+        colors: IntArray,
+        radius: Int,
+        stroke: Int,
+        strokeWidth: Int
+    ): GradientDrawable {
         return GradientDrawable(
-            GradientDrawable.Orientation.LEFT_RIGHT,
+            GradientDrawable.Orientation.TL_BR,
             colors
         ).apply {
-            cornerRadius = dp(20).toFloat()
-        }
-    }
-
-    private fun cardBackground(): GradientDrawable {
-        return GradientDrawable().apply {
-            setColor(card)
-            cornerRadius = dp(18).toFloat()
-            setStroke(dp(1), Color.rgb(48, 61, 100))
+            cornerRadius = dp(radius).toFloat()
+            setStroke(dp(strokeWidth), stroke)
         }
     }
 
     private fun circleBackground(): GradientDrawable {
         return GradientDrawable().apply {
             shape = GradientDrawable.OVAL
-            setColor(card)
+            setColor(panel)
             setStroke(dp(2), cyan)
         }
     }
 
+    private fun matchWrap(top: Int = 0): LinearLayout.LayoutParams {
+        return LinearLayout.LayoutParams(-1, -2).apply {
+            if (top > 0) {
+                topMargin = dp(top)
+            }
+        }
+    }
+
+    private fun weighted(): LinearLayout.LayoutParams {
+        return LinearLayout.LayoutParams(0, -2, 1f).apply {
+            marginEnd = dp(5)
+        }
+    }
+
+    private fun enterRoom(defaultId: String? = null) {
+        val input = EditText(this).apply {
+            hint = "Enter Room ID"
+            setTextColor(white)
+            setHintTextColor(muted)
+
+            if (defaultId != null) {
+                setText(defaultId)
+            }
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Join Voice Room")
+            .setView(input)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Join") { _, _ ->
+
+                val id = input.text.toString().trim()
+
+                if (id.isBlank()) {
+                    notice("Please enter Room ID")
+                    return@setPositiveButton
+                }
+
+                startActivity(
+                    Intent(this, RoomActivity::class.java)
+                        .putExtra("roomID", id)
+                )
+            }
+            .show()
+    }
+
     private fun notice(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        Toast.makeText(
+            this,
+            message,
+            Toast.LENGTH_LONG
+        ).show()
     }
 
     private fun dp(value: Int): Int {
-        return (value * resources.displayMetrics.density).toInt()
+        return (
+            value * resources.displayMetrics.density
+        ).toInt()
     }
 }
