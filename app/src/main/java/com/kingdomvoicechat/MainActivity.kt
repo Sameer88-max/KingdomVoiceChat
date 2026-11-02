@@ -1,170 +1,379 @@
-// app/src/main/java/com/kingdomvoicechat/KingdomTheme.kt
 
 package com.kingdomvoicechat
 
-import android.app.Activity
-import android.graphics.Color
-import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
+import android.content.Intent
+import android.os.Bundle
 import android.view.Gravity
 import android.view.View
-import android.widget.LinearLayout
-import android.widget.TextView
+import android.widget.*
+import androidx.appcompat.app.AppCompatActivity
+import com.google.firebase.auth.FirebaseAuth
 
-object KingdomTheme {
+class MainActivity : AppCompatActivity() {
 
-    const val BACKGROUND = 0xFF080D20.toInt()
-    const val SURFACE = 0xFF111A35.toInt()
-    const val CARD = 0xFF172344.toInt()
-    const val CARD_LIGHT = 0xFF202F55.toInt()
-    const val WHITE = 0xFFFFFFFF.toInt()
-    const val MUTED = 0xFF9BAAC8.toInt()
-    const val CYAN = 0xFF36D9F5.toInt()
-    const val BLUE = 0xFF397BFF.toInt()
-    const val PURPLE = 0xFF895BFF.toInt()
-    const val PINK = 0xFFFF5FA2.toInt()
-    const val GREEN = 0xFF39D99A.toInt()
+    private lateinit var root: LinearLayout
+    private lateinit var content: LinearLayout
+    private lateinit var navigation: LinearLayout
 
-    fun gradient(
-        first: Int = BLUE,
-        second: Int = PURPLE,
-        radius: Float = 22f
-    ): GradientDrawable {
-        return GradientDrawable(
-            GradientDrawable.Orientation.LEFT_RIGHT,
-            intArrayOf(first, second)
-        ).apply {
-            cornerRadius = radius
-        }
+    private var selectedTab = "Home"
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        KingdomTheme.applyTo(this)
+        buildLayout()
+        showTab("Home")
     }
 
-    fun background(
-        color: Int = CARD,
-        radius: Float = 22f,
-        strokeColor: Int = Color.TRANSPARENT
-    ): GradientDrawable {
-        return GradientDrawable().apply {
-            setColor(color)
-            cornerRadius = radius
-            if (strokeColor != Color.TRANSPARENT) {
-                setStroke(1, strokeColor)
-            }
-        }
-    }
-
-    fun text(
-        activity: Activity,
-        value: String,
-        size: Float = 14f,
-        color: Int = WHITE,
-        bold: Boolean = false
-    ): TextView {
-        return TextView(activity).apply {
-            text = value
-            textSize = size
-            setTextColor(color)
-            if (bold) typeface = Typeface.DEFAULT_BOLD
-        }
-    }
-
-    fun card(activity: Activity): LinearLayout {
-        return LinearLayout(activity).apply {
+    private fun buildLayout() {
+        root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(16, 15, 16, 15)
-            background = KingdomTheme.background(
-                CARD, 24f, 0xFF263B68.toInt()
-            )
-            elevation = 5f
+            setBackgroundColor(KingdomTheme.BACKGROUND)
         }
-    }
 
-    fun button(
-        activity: Activity,
-        title: String,
-        color1: Int = BLUE,
-        color2: Int = PURPLE
-    ): TextView {
-        return TextView(activity).apply {
-            text = title
-            textSize = 14f
-            setTextColor(WHITE)
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            setPadding(18, 13, 18, 13)
-            background = gradient(color1, color2, 18f)
-            isClickable = true
-            isFocusable = true
-        }
-    }
-
-    fun heading(activity: Activity, title: String): TextView {
-        return TextView(activity).apply {
-            text = title
-            textSize = 20f
-            setTextColor(WHITE)
-            typeface = Typeface.DEFAULT_BOLD
-            setPadding(0, 12, 0, 10)
-        }
-    }
-
-    fun page(activity: Activity): LinearLayout {
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(16, 18, 16, 12)
-            setBackgroundColor(BACKGROUND)
-        }
-    }
-
-    fun row(activity: Activity): LinearLayout {
-        return LinearLayout(activity).apply {
+        val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            setPadding(18, 18, 18, 14)
+            setBackgroundColor(KingdomTheme.SURFACE)
+        }
+
+        val logo = TextView(this).apply {
+            text = "KINGDOM"
+            textSize = 21f
+            setTextColor(KingdomTheme.CYAN)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+
+        header.addView(
+            logo,
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+
+        val settings = KingdomTheme.button(this, "⚙ Settings")
+        settings.setOnClickListener {
+            startActivity(
+                Intent(this, ThemeSettingsActivity::class.java)
+            )
+        }
+        header.addView(settings)
+
+        root.addView(header)
+
+        val scroll = ScrollView(this)
+        content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(16, 16, 16, 24)
+        }
+
+        scroll.addView(content)
+        root.addView(
+            scroll,
+            LinearLayout.LayoutParams(0, 0, 1f)
+        )
+
+        navigation = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(4, 10, 4, 10)
+            setBackgroundColor(KingdomTheme.SURFACE)
+        }
+
+        listOf("Home", "Rooms", "Messages", "Profile").forEach { tab ->
+            val item = TextView(this).apply {
+                text = tab
+                gravity = Gravity.CENTER
+                textSize = 12f
+                setPadding(4, 12, 4, 12)
+                setOnClickListener { showTab(tab) }
+            }
+
+            navigation.addView(
+                item,
+                LinearLayout.LayoutParams(0, -2, 1f)
+            )
+        }
+
+        KingdomTheme.styleBottomNavigation(navigation)
+        root.addView(navigation)
+
+        setContentView(root)
+    }
+
+    private fun showTab(tab: String) {
+        selectedTab = tab
+        content.removeAllViews()
+
+        when (tab) {
+            "Home" -> showHome()
+            "Rooms" -> showRooms()
+            "Messages" -> showMessages()
+            "Profile" -> showProfile()
+        }
+
+        updateNavigation()
+    }
+
+    private fun updateNavigation() {
+        for (i in 0 until navigation.childCount) {
+            val item = navigation.getChildAt(i) as TextView
+            val active = item.text.toString() == selectedTab
+
+            item.setTextColor(
+                if (active) KingdomTheme.CYAN
+                else KingdomTheme.MUTED
+            )
+            item.textSize = if (active) 13f else 12f
+            item.setTypeface(
+                null,
+                if (active) android.graphics.Typeface.BOLD
+                else android.graphics.Typeface.NORMAL
+            )
         }
     }
 
-    fun divider(activity: Activity): View {
-        return View(activity).apply {
-            setBackgroundColor(0xFF263657.toInt())
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 1
-            ).apply {
+    private fun showHome() {
+        content.addView(
+            KingdomTheme.heading(this, "Welcome to KINGDOM")
+        )
+
+        addCard(
+            "Your Voice. Your Kingdom.",
+            "Connect with people, join voice rooms and enjoy live conversations."
+        )
+
+        content.addView(
+            KingdomTheme.heading(this, "Discover")
+        )
+
+        addActionCard(
+            "🎙 Voice Rooms",
+            "Explore available voice rooms"
+        ) {
+            showTab("Rooms")
+        }
+
+        addActionCard(
+            "💬 Messages",
+            "Open your conversations"
+        ) {
+            showTab("Messages")
+        }
+
+        addActionCard(
+            "👤 My Profile",
+            "View your account and profile"
+        ) {
+            showTab("Profile")
+        }
+    }
+
+    private fun showRooms() {
+        content.addView(
+            KingdomTheme.heading(this, "Voice Rooms")
+        )
+
+        addCard(
+            "Find Your Room",
+            "Enter a room number to join a personal or official room."
+        )
+
+        val roomInput = EditText(this).apply {
+            hint = "Enter room number"
+            setHintTextColor(KingdomTheme.MUTED)
+            setTextColor(KingdomTheme.WHITE)
+            textSize = 16f
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setPadding(16, 14, 16, 14)
+            background = KingdomTheme.background(
+                KingdomTheme.CARD_LIGHT,
+                18f
+            )
+        }
+
+        content.addView(
+            roomInput,
+            LinearLayout.LayoutParams(-1, -2).apply {
                 topMargin = 12
                 bottomMargin = 12
             }
+        )
+
+        val joinButton = KingdomTheme.button(
+            this,
+            "JOIN ROOM"
+        )
+
+        joinButton.setOnClickListener {
+            val roomID = roomInput.text.toString().trim()
+
+            if (roomID.isBlank()) {
+                Toast.makeText(
+                    this,
+                    "Enter room number",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                val intent = Intent(this, RoomActivity::class.java)
+                intent.putExtra("roomID", roomID)
+                startActivity(intent)
+            }
+        }
+
+        content.addView(joinButton)
+
+        content.addView(
+            KingdomTheme.heading(this, "Room Options")
+        )
+
+        addActionCard(
+            "🌐 Official Rooms",
+            "Join an official room using its room number."
+        ) {
+            roomInput.requestFocus()
+            Toast.makeText(
+                this,
+                "Enter an official room number above",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+
+        addActionCard(
+            "🏠 Personal Rooms",
+            "Join a user's personal room using its number."
+        ) {
+            roomInput.requestFocus()
         }
     }
 
-    fun applyTo(activity: Activity) {
-        activity.window.statusBarColor = BACKGROUND
-        activity.window.navigationBarColor = BACKGROUND
-        activity.window.decorView.setBackgroundColor(BACKGROUND)
+    private fun showMessages() {
+        content.addView(
+            KingdomTheme.heading(this, "Messages")
+        )
+
+        addCard(
+            "Your Conversations",
+            "Your chat conversations will appear here."
+        )
+
+        addActionCard(
+            "Refresh Messages",
+            "Reload your conversations"
+        ) {
+            Toast.makeText(
+                this,
+                "Messages screen is ready for chat integration",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
-    fun styleBottomNavigation(view: View) {
-        view.setBackgroundColor(SURFACE)
-        view.elevation = 14f
+    private fun showProfile() {
+        content.addView(
+            KingdomTheme.heading(this, "My Profile")
+        )
+
+        val user = FirebaseAuth.getInstance().currentUser
+
+        val name = user?.displayName ?: "Kingdom Member"
+        val email = user?.email ?: "No email available"
+
+        addCard(
+            "👤 $name",
+            email
+        )
+
+        addActionCard(
+            "⚙ Theme Settings",
+            "Change app colours and card styles"
+        ) {
+            startActivity(
+                Intent(this, ThemeSettingsActivity::class.java)
+            )
+        }
+
+        addActionCard(
+            "🚪 Logout",
+            "Sign out from your account"
+        ) {
+            FirebaseAuth.getInstance().signOut()
+            Toast.makeText(
+                this,
+                "Logged out",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            finish()
+        }
     }
 
-    fun styleScreen(root: LinearLayout) {
-        root.setBackgroundColor(BACKGROUND)
-        root.setPadding(16, 14, 16, 12)
+    private fun addCard(title: String, description: String) {
+        val card = KingdomTheme.card(this)
+
+        card.addView(
+            KingdomTheme.text(
+                this,
+                title,
+                18f,
+                KingdomTheme.CYAN,
+                true
+            )
+        )
+
+        val detail = KingdomTheme.text(
+            this,
+            description,
+            13f,
+            KingdomTheme.MUTED
+        )
+
+        detail.setPadding(0, 9, 0, 0)
+        card.addView(detail)
+
+        content.addView(
+            card,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = 14
+            }
+        )
+    }
+
+    private fun addActionCard(
+        title: String,
+        description: String,
+        action: () -> Unit
+    ) {
+        val card = KingdomTheme.card(this)
+
+        card.isClickable = true
+        card.isFocusable = true
+        card.setOnClickListener { action() }
+
+        card.addView(
+            KingdomTheme.text(
+                this,
+                title,
+                16f,
+                KingdomTheme.WHITE,
+                true
+            )
+        )
+
+        val detail = KingdomTheme.text(
+            this,
+            description,
+            12f,
+            KingdomTheme.MUTED
+        )
+
+        detail.setPadding(0, 7, 0, 0)
+        card.addView(detail)
+
+        content.addView(
+            card,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = 12
+            }
+        )
     }
 }
-
-/*
-MAIN ACTIVITY INTEGRATION:
-
-1. MainActivity.onCreate() ke andar:
-   KingdomTheme.applyTo(this)
-
-2. Bottom navigation view banane ke baad:
-   KingdomTheme.styleBottomNavigation(bottomNavigationView)
-
-3. Har screen ke root LinearLayout par:
-   KingdomTheme.styleScreen(root)
-
-Example:
-val root = KingdomTheme.page(this)
-root.addView(KingdomTheme.heading(this, "KINGDOM"))
-setContentView(root)
-*/
