@@ -15,11 +15,13 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.functions.FirebaseFunctions
 
 class MainActivity : Activity() {
 
     private val auth by lazy { FirebaseAuth.getInstance() }
     private val db by lazy { FirebaseFirestore.getInstance() }
+    private val functions by lazy { FirebaseFunctions.getInstance() }
 
     private val bg = Color.rgb(10, 15, 35)
     private val card = Color.rgb(25, 34, 65)
@@ -42,7 +44,6 @@ class MainActivity : Activity() {
 
     companion object {
         private const val PHOTO_REQUEST = 501
-        private const val FIRST_NUMERIC_ID = 1000001L
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,89 +71,61 @@ class MainActivity : Activity() {
         }
     }
 
-    // USER PROFILE CREATION
+    // USER PROFILE CREATION AND CLOUD FUNCTION SYNC
 
     private fun ensurePublicProfile() {
         val user = auth.currentUser ?: return
 
-        val userRef = db.collection("users").document(user.uid)
-        val publicRef = db.collection("publicProfiles").document(user.uid)
-        val counterRef = db.collection("appCounters")
-            .document("userNumericId")
-
-        db.runTransaction { transaction ->
-            val userDoc = transaction.get(userRef)
-            val publicDoc = transaction.get(publicRef)
-
-            val oldId = userDoc.getLong("numericId")
-                ?: publicDoc.getLong("numericId")
-
-            val numericId = if (oldId != null) {
-                oldId
-            } else {
-                val counter = transaction.get(counterRef)
-                val lastId = counter.getLong("lastId")
-                    ?: FIRST_NUMERIC_ID - 1
-
-                val newId = lastId + 1
-
-                transaction.set(
-                    counterRef,
-                    mapOf("lastId" to newId),
-                    SetOptions.merge()
-                )
-                newId
-            }
-
-            val name = userDoc.getString("name")
-                ?: user.email?.substringBefore("@")
-                ?: "Kingdom User"
-
-            val country = userDoc.getString("country") ?: ""
-
-            val data = mapOf(
-                "numericId" to numericId,
-                "name" to name,
-                "country" to country,
-                "updatedAt" to FieldValue.serverTimestamp()
-            )
-
-            transaction.set(userRef, data, SetOptions.merge())
-            transaction.set(publicRef, data, SetOptions.merge())
-
-            numericId
-        }.addOnFailureListener {
-            notice("Profile setup failed: ${it.localizedMessage}")
-        }
-    }
-
-    private fun syncPublicProfile(name: String, country: String) {
-        val user = auth.currentUser ?: return
-
-        db.collection("users").document(user.uid).get()
+        db.collection("users").document(user.uid)
+            .get()
             .addOnSuccessListener { document ->
 
-                val data = hashMapOf<String, Any>(
-                    "name" to name,
-                    "country" to country,
-                    "updatedAt" to FieldValue.serverTimestamp()
+                val name = document.getString("name")
+                    ?: user.email?.substringBefore("@")
+                    ?: "Kingdom User"
+
+                val country = document.getString("country") ?: ""
+
+                syncPublicProfile(name, country) { success, message ->
+                    if (!success) {
+                        notice(message)
+                    }
+                }
+            }
+            .addOnFailureListener {
+                notice("Profile load failed: ${it.localizedMessage}")
+            }
+    }
+
+    private fun syncPublicProfile(
+        name: String,
+        country: String,
+        callback: ((Boolean, String) -> Unit)? = null
+    ) {
+        val data = hashMapOf<String, Any>(
+            "name" to name,
+            "country" to country
+        )
+
+        functions
+            .getHttpsCallable("syncPublicProfile")
+            .call(data)
+            .addOnSuccessListener { result ->
+
+                val response = result.data as? Map<*, *>
+                val numericId = response?.get("numericId")
+
+                callback?.invoke(
+                    true,
+                    "Profile synced. Your ID: $numericId"
                 )
+            }
+            .addOnFailureListener { error ->
 
-                document.getLong("numericId")?.let {
-                    data["numericId"] = it
-                }
-
-                document.getString("gender")?.let {
-                    data["gender"] = it
-                }
-
-                document.get("age")?.let {
-                    data["age"] = it
-                }
-
-                db.collection("publicProfiles")
-                    .document(user.uid)
-                    .set(data, SetOptions.merge())
+                callback?.invoke(
+                    false,
+                    error.localizedMessage ?: "Profile sync failed"
+                )
             }
     }
 
@@ -543,6 +516,7 @@ class MainActivity : Activity() {
         content.addView(label("Gender"))
 
         lateinit var genderButton: TextView
+
         genderButton = button("Select Gender: $selectedGender") {
             val genders = arrayOf("Male", "Female", "Other", "Not specified")
 
@@ -558,45 +532,73 @@ class MainActivity : Activity() {
         content.addView(genderButton)
 
         val saveButton = button("Save Profile") {
+
             val name = profileName.text.toString().trim()
             val country = profileCountry.text.toString().trim()
-            val age = profileAge.text.toString().trim()
+            val ageText = profileAge.text.toString().trim()
 
             if (name.isBlank()) {
                 notice("Please enter your name")
                 return@button
             }
 
-            if (age.isNotBlank() && age.toIntOrNull() == null) {
+            if (name.length > 40) {
+                notice("Name must be 40 characters or less")
+                return@button
+            }
+
+            if (country.length > 60) {
+                notice("Country must be 60 characters or less")
+                return@button
+            }
+
+            val age = if (ageText.isBlank()) {
+                null
+            } else {
+                ageText.toIntOrNull()
+            }
+
+            if (ageText.isNotBlank() && (age == null || age !in 1..120)) {
                 notice("Enter a valid age")
                 return@button
             }
 
             val user = auth.currentUser ?: return@button
 
-            val data = hashMapOf<String, Any>(
-                "name" to name,
-                "country" to country,
-                "gender" to selectedGender,
-                "updatedAt" to FieldValue.serverTimestamp()
-            )
+            // Public profile sync through trusted Cloud Function.
+            syncPublicProfile(name, country) { success, message ->
 
-            if (age.isNotBlank()) {
-                data["age"] = age.toInt()
+                if (!success) {
+                    notice(message)
+                    return@syncPublicProfile
+                }
+
+                // Keep age and gender private in users collection.
+                val privateData = hashMapOf<String, Any>(
+                    "name" to name,
+                    "country" to country,
+                    "gender" to selectedGender,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+
+                if (age != null) {
+                    privateData["age"] = age
+                }
+
+                db.collection("users")
+                    .document(user.uid)
+                    .set(privateData, SetOptions.merge())
+                    .addOnSuccessListener {
+                        notice(message)
+                        currentFeature = null
+                        showProfileMenu()
+                    }
+                    .addOnFailureListener {
+                        notice(
+                            it.localizedMessage ?: "Private profile save failed"
+                        )
+                    }
             }
-
-            db.collection("users")
-                .document(user.uid)
-                .set(data, SetOptions.merge())
-                .addOnSuccessListener {
-                    syncPublicProfile(name, country)
-                    notice("Profile saved successfully")
-                    currentFeature = null
-                    showProfileMenu()
-                }
-                .addOnFailureListener {
-                    notice(it.localizedMessage ?: "Profile save failed")
-                }
         }
 
         content.addView(
@@ -611,7 +613,10 @@ class MainActivity : Activity() {
         auth.currentUser?.let { user ->
             db.collection("users").document(user.uid).get()
                 .addOnSuccessListener { document ->
-                    if (isFinishing || isDestroyed) return@addOnSuccessListener
+
+                    if (isFinishing || isDestroyed) {
+                        return@addOnSuccessListener
+                    }
 
                     profileName.setText(document.getString("name") ?: "")
                     profileCountry.setText(document.getString("country") ?: "")
@@ -832,6 +837,7 @@ class MainActivity : Activity() {
             .setView(box)
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Send Gift") { _, _ ->
+
                 val receiver = receiverInput.text.toString().trim()
                 val roomId = roomInput.text.toString().trim()
 
@@ -892,6 +898,7 @@ class MainActivity : Activity() {
             .setMessage("Are you sure you want to sign out?")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Sign Out") { _, _ ->
+
                 auth.signOut()
 
                 val intent = Intent(this, AuthActivity::class.java).apply {
