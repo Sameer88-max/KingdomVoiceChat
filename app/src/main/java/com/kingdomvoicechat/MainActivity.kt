@@ -1,4 +1,3 @@
-
 package com.kingdomvoicechat
 
 import android.app.Activity
@@ -44,13 +43,13 @@ class MainActivity : Activity() {
     private var chatListener: ListenerRegistration? = null
     private var chatScroll: ScrollView? = null
     private var chatMessagesBox: LinearLayout? = null
-    private var activeChatId: String? = null
 
     private lateinit var profileName: EditText
     private lateinit var profileCountry: EditText
     private lateinit var profileAge: EditText
     private lateinit var profileGender: TextView
     private lateinit var profileImage: ImageView
+    private lateinit var profileStatus: TextView
 
     private val photoPrefs by lazy {
         getSharedPreferences("kvc_profile", MODE_PRIVATE)
@@ -58,15 +57,24 @@ class MainActivity : Activity() {
 
     companion object {
         private const val PHOTO_REQUEST = 501
+        private const val COUNTER_COLLECTION = "appCounters"
+        private const val COUNTER_DOCUMENT = "userNumericId"
+        private const val FIRST_NUMERIC_ID = 1000001L
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         window.statusBarColor = bg
         window.navigationBarColor = bg
 
+        if (auth.currentUser == null) {
+            finish()
+            return
+        }
+
         ensurePublicProfile()
-        showHome()
+        showTab("Home")
     }
 
     override fun onDestroy() {
@@ -78,31 +86,94 @@ class MainActivity : Activity() {
     override fun onBackPressed() {
         chatListener?.remove()
         chatListener = null
-        activeChatId = null
 
         if (currentFeature != null) {
             currentFeature = null
             showTab(currentTab)
         } else if (currentTab != "Home") {
-            showHome()
+            showTab("Home")
         } else {
             super.onBackPressed()
         }
     }
 
-    // PUBLIC PROFILE
+    // NUMERIC USER ID AND PUBLIC PROFILE
 
     private fun ensurePublicProfile() {
         val user = auth.currentUser ?: return
 
+        val userRef = db.collection("users").document(user.uid)
+        val publicRef = db.collection("publicProfiles").document(user.uid)
+        val counterRef = db.collection(COUNTER_COLLECTION)
+            .document(COUNTER_DOCUMENT)
+
+        db.runTransaction { transaction ->
+
+            val userDoc = transaction.get(userRef)
+            val publicDoc = transaction.get(publicRef)
+
+            val existingId = userDoc.getLong("numericId")
+                ?: publicDoc.getLong("numericId")
+
+            val numericId = if (existingId != null) {
+                existingId
+            } else {
+                val counterDoc = transaction.get(counterRef)
+                val lastId = counterDoc.getLong("lastId")
+                    ?: FIRST_NUMERIC_ID - 1
+
+                val nextId = lastId + 1
+
+                transaction.set(
+                    counterRef,
+                    mapOf("lastId" to nextId)
+                )
+
+                nextId
+            }
+
+            val name = userDoc.getString("name")
+                ?: user.email?.substringBefore("@")
+                ?: "Kingdom User"
+
+            val country = userDoc.getString("country") ?: ""
+
+            transaction.set(
+                userRef,
+                mapOf(
+                    "numericId" to numericId,
+                    "name" to name,
+                    "country" to country,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                ),
+                com.google.firebase.firestore.SetOptions.merge()
+            )
+
+            transaction.set(
+                publicRef,
+                mapOf(
+                    "numericId" to numericId,
+                    "name" to name,
+                    "country" to country,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                ),
+                com.google.firebase.firestore.SetOptions.merge()
+            )
+
+            numericId
+        }.addOnFailureListener {
+            notice("User ID generation failed: ${it.localizedMessage}")
+        }
+    }
+
+    private fun syncPublicProfile(name: String, country: String) {
+        val user = auth.currentUser ?: return
+
         db.collection("users").document(user.uid)
             .get()
-            .addOnSuccessListener { doc ->
-                val name = doc.getString("name")
-                    ?: user.email?.substringBefore("@")
-                    ?: "Kingdom User"
+            .addOnSuccessListener { userDoc ->
 
-                val country = doc.getString("country") ?: ""
+                val numericId = userDoc.getLong("numericId")
 
                 val data = hashMapOf<String, Any>(
                     "name" to name,
@@ -110,25 +181,13 @@ class MainActivity : Activity() {
                     "updatedAt" to FieldValue.serverTimestamp()
                 )
 
+                if (numericId != null) {
+                    data["numericId"] = numericId
+                }
+
                 db.collection("publicProfiles")
                     .document(user.uid)
-                    .set(data)
-            }
-    }
-
-    private fun syncPublicProfile(name: String, country: String) {
-        val uid = auth.currentUser?.uid ?: return
-
-        db.collection("publicProfiles").document(uid)
-            .set(
-                mapOf(
-                    "name" to name,
-                    "country" to country,
-                    "updatedAt" to FieldValue.serverTimestamp()
-                )
-            )
-            .addOnFailureListener {
-                notice("Profile sync failed: ${it.localizedMessage}")
+                    .set(data, com.google.firebase.firestore.SetOptions.merge())
             }
     }
 
@@ -140,72 +199,63 @@ class MainActivity : Activity() {
 
         chatListener?.remove()
         chatListener = null
-        activeChatId = null
 
         when (tab) {
             "Home" -> showHome()
-            "Rooms" -> showRoomsTab()
-            "Messages" -> showMessagesTab()
-            "Profile" -> showProfileTab()
+            "Rooms" -> showRooms()
+            "Messages" -> showMessages()
+            "Profile" -> showProfileMenu()
         }
     }
 
-    private fun showHome() {
-        showTabContent("Home")
-    }
-
-    private fun showTabContent(tab: String) {
+    private fun createTabLayout(): Pair<LinearLayout, LinearLayout> {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(bg)
         }
 
-        val content = ScrollView(this).apply {
-            isFillViewport = true
-            setBackgroundColor(bg)
-        }
-
-        val page = LinearLayout(this).apply {
+        val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(20), dp(18), dp(24))
+            setPadding(dp(18), dp(18), dp(18), dp(18))
         }
 
-        content.addView(page)
-        root.addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
-
-        when (tab) {
-            "Home" -> buildHome(page)
-            "Rooms" -> buildRooms(page)
-            "Messages" -> buildMessages(page)
-            "Profile" -> buildProfileMenu(page)
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            addView(content)
         }
 
-        root.addView(bottomNavigation(tab))
-        setContentView(root)
+        root.addView(
+            scroll,
+            LinearLayout.LayoutParams(-1, 0, 1f)
+        )
+
+        root.addView(bottomNavigation())
+
+        return Pair(root, content)
     }
 
-    private fun bottomNavigation(selected: String): LinearLayout {
+    private fun bottomNavigation(): LinearLayout {
         val nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(dp(5), dp(8), dp(5), dp(8))
+            setPadding(dp(4), dp(7), dp(4), dp(7))
             setBackgroundColor(Color.rgb(19, 22, 49))
         }
 
         val items = listOf(
-            Triple("⌂", "Home", "Home"),
-            Triple("🎙", "Rooms", "Rooms"),
-            Triple("✉", "Messages", "Messages"),
-            Triple("♙", "Profile", "Profile")
+            Pair("⌂", "Home"),
+            Pair("🎙", "Rooms"),
+            Pair("✉", "Messages"),
+            Pair("♙", "Profile")
         )
 
         items.forEach { item ->
-            val active = selected == item.second
 
-            val box = LinearLayout(this).apply {
+            val selected = currentTab == item.second
+
+            val button = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
-                setPadding(dp(4), dp(5), dp(4), dp(5))
                 isClickable = true
                 isFocusable = true
                 setOnClickListener {
@@ -213,26 +263,26 @@ class MainActivity : Activity() {
                 }
             }
 
-            box.addView(
+            button.addView(
                 text(
                     item.first,
                     23f,
-                    if (active) cyan else muted,
+                    if (selected) cyan else muted,
                     true
                 )
             )
 
-            box.addView(
+            button.addView(
                 text(
-                    item.third,
+                    item.second,
                     11f,
-                    if (active) cyan else muted,
-                    active
+                    if (selected) cyan else muted,
+                    selected
                 )
             )
 
             nav.addView(
-                box,
+                button,
                 LinearLayout.LayoutParams(0, dp(55), 1f)
             )
         }
@@ -242,7 +292,9 @@ class MainActivity : Activity() {
 
     // HOME
 
-    private fun buildHome(page: LinearLayout) {
+    private fun showHome() {
+        val (root, page) = createTabLayout()
+
         val header = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
         }
@@ -258,11 +310,15 @@ class MainActivity : Activity() {
 
         header.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
 
-        val bell = text("🔔", 23f, white, false)
-        bell.setOnClickListener {
-            showSimpleScreen("Notifications", "Your notifications will appear here.")
+        val notification = text("🔔", 23f, white, false)
+        notification.setOnClickListener {
+            showSimpleScreen(
+                "Notifications",
+                "Your notifications will appear here."
+            )
         }
-        header.addView(bell)
+
+        header.addView(notification)
         page.addView(header)
 
         val hero = LinearLayout(this).apply {
@@ -306,22 +362,28 @@ class MainActivity : Activity() {
         page.addView(
             hero,
             LinearLayout.LayoutParams(-1, -2).apply {
-                topMargin = dp(22)
+                topMargin = dp(20)
             }
         )
 
         section(page, "Discover Kingdom", "EXPLORE")
 
         addRow(
-            page, "🎙", "Voice Rooms",
-            "Explore official and normal rooms", cyan
+            page,
+            "🎙",
+            "Voice Rooms",
+            "Explore official and normal rooms",
+            cyan
         ) {
             showTab("Rooms")
         }
 
         addRow(
-            page, "📢", "Official Announcements",
-            "News and event announcements", purple
+            page,
+            "📢",
+            "Official Announcements",
+            "News and event announcements",
+            purple
         ) {
             showSimpleScreen(
                 "Official Announcements",
@@ -330,29 +392,26 @@ class MainActivity : Activity() {
         }
 
         addRow(
-            page, "⭐", "Featured Rooms",
-            "Discover featured voice rooms", gold
+            page,
+            "⭐",
+            "Featured Rooms",
+            "Discover featured voice rooms",
+            gold
         ) {
             showTab("Rooms")
         }
 
-        val footer = text("KINGDOM VOICE CHAT APP", 10f, muted, true)
-        footer.gravity = Gravity.CENTER
-        footer.setPadding(0, dp(24), 0, dp(4))
-        page.addView(footer)
+        setContentView(root)
     }
 
     // ROOMS
 
-    private fun buildRooms(page: LinearLayout) {
+    private fun showRooms() {
+        val (root, page) = createTabLayout()
+
         page.addView(text("Explore Rooms", 25f, white, true))
         page.addView(
-            text(
-                "Find your favourite voice room.",
-                13f,
-                muted,
-                false
-            )
+            text("Find your favourite voice room.", 13f, muted, false)
         )
 
         section(page, "Room Categories", "DISCOVER")
@@ -380,10 +439,8 @@ class MainActivity : Activity() {
                 topMargin = dp(15)
             }
         )
-    }
 
-    private fun showRoomsTab() {
-        showTabContent("Rooms")
+        setContentView(root)
     }
 
     private fun openRooms() {
@@ -396,20 +453,23 @@ class MainActivity : Activity() {
 
     // MESSAGES
 
-    private fun buildMessages(page: LinearLayout) {
+    private fun showMessages() {
+        val (root, page) = createTabLayout()
+
         page.addView(text("Messages", 25f, white, true))
         page.addView(
-            text("Private conversations with mutual followers.",
-                13f, muted, false)
+            text(
+                "Private conversations with mutual followers.",
+                13f,
+                muted,
+                false
+            )
         )
+
+        section(page, "Your Messages", "CHAT")
 
         addRow(page, "💬", "Conversations",
             "Open your private chats", cyan) {
-            showPeople(true)
-        }
-
-        addRow(page, "👥", "Message Contacts",
-            "Users you both follow", purple) {
             showPeople(true)
         }
 
@@ -421,18 +481,16 @@ class MainActivity : Activity() {
             )
         }
 
+        section(page, "Available Contacts", "MUTUAL FOLLOWERS")
+
         val list = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
 
-        section(page, "Available Contacts", "MUTUAL FOLLOWERS")
         page.addView(list)
-
         loadMutualContacts(list)
-    }
 
-    private fun showMessagesTab() {
-        showTabContent("Messages")
+        setContentView(root)
     }
 
     private fun loadMutualContacts(list: LinearLayout) {
@@ -441,6 +499,9 @@ class MainActivity : Activity() {
         db.collection("publicProfiles")
             .get()
             .addOnSuccessListener { result ->
+
+                if (isFinishing || isDestroyed) return@addOnSuccessListener
+
                 list.removeAllViews()
 
                 result.documents.forEach { doc ->
@@ -453,6 +514,7 @@ class MainActivity : Activity() {
                         .document(otherUid)
                         .get()
                         .addOnSuccessListener first@{ mine ->
+
                             if (!mine.exists()) return@first
 
                             db.collection("follows")
@@ -461,15 +523,24 @@ class MainActivity : Activity() {
                                 .document(myUid)
                                 .get()
                                 .addOnSuccessListener second@{ theirs ->
+
                                     if (!theirs.exists()) return@second
+                                    if (isFinishing || isDestroyed) return@second
 
                                     val name = doc.getString("name") ?: "User"
+                                    val numericId = doc.getLong("numericId")
+
+                                    val label = if (numericId != null) {
+                                        "$name\nID: $numericId"
+                                    } else {
+                                        name
+                                    }
 
                                     list.addView(
-                                        tile("👤", name, cyan) {
+                                        tile("👤", label, cyan) {
                                             openChat(otherUid, name)
                                         },
-                                        LinearLayout.LayoutParams(-1, dp(65)).apply {
+                                        LinearLayout.LayoutParams(-1, dp(70)).apply {
                                             bottomMargin = dp(8)
                                         }
                                     )
@@ -490,18 +561,38 @@ class MainActivity : Activity() {
 
     // PROFILE MENU
 
-    private fun buildProfileMenu(page: LinearLayout) {
+    private fun showProfileMenu() {
+        val (root, page) = createTabLayout()
+
         page.addView(text("My Account", 25f, white, true))
 
         val user = auth.currentUser
-        val email = user?.email ?: "Not signed in"
+        val uid = user?.uid
+
+        val accountCard = infoCard(
+            "ACCOUNT",
+            user?.email ?: "Not signed in"
+        )
 
         page.addView(
-            infoCard("SIGNED-IN ACCOUNT", email),
+            accountCard,
             LinearLayout.LayoutParams(-1, -2).apply {
                 topMargin = dp(15)
             }
         )
+
+        if (uid != null) {
+            db.collection("users").document(uid)
+                .get()
+                .addOnSuccessListener { doc ->
+                    val numericId = doc.getLong("numericId")
+                    if (numericId != null && !isFinishing && !isDestroyed) {
+                        accountCard.addView(
+                            text("USER ID: $numericId", 14f, cyan, true)
+                        )
+                    }
+                }
+        }
 
         section(page, "Personal Profile", "MY ACCOUNT")
 
@@ -521,11 +612,8 @@ class MainActivity : Activity() {
         }
 
         addRow(page, "🔎", "Search User",
-            "Find a user by ID", cyan) {
-            showSimpleScreen(
-                "Search User",
-                "User search screen is not connected yet."
-            )
+            "Find a user by numeric ID", cyan) {
+            showUserSearch()
         }
 
         addRow(page, "🎁", "Gifts Received",
@@ -550,7 +638,7 @@ class MainActivity : Activity() {
             "Read Kingdom Voice Chat privacy policy", cyan) {
             showSimpleScreen(
                 "Privacy Policy",
-                "Add your approved privacy policy text here before publishing."
+                "Your approved privacy policy will appear here."
             )
         }
 
@@ -576,59 +664,8 @@ class MainActivity : Activity() {
             "Delete your sign-in account", pink) {
             confirmDeleteAccount()
         }
-    }
 
-    private fun showProfileTab() {
-        showTabContent("Profile")
-    }
-
-    // WALLET
-
-    private fun showWallet() {
-        currentFeature = "Wallet"
-
-        val screen = page("My Wallet")
-        val balance = text("Loading wallet...", 19f, white, true)
-
-        screen.addView(
-            infoCard("YOUR WALLET", "Your current account balance")
-        )
-
-        screen.addView(
-            balance,
-            LinearLayout.LayoutParams(-1, dp(100)).apply {
-                topMargin = dp(15)
-            }
-        )
-
-        screen.addView(
-            button("REFRESH BALANCE") {
-                loadWalletBalance(balance)
-            },
-            LinearLayout.LayoutParams(-1, dp(50)).apply {
-                topMargin = dp(12)
-            }
-        )
-
-        setContentView(screen)
-        loadWalletBalance(balance)
-    }
-
-    private fun loadWalletBalance(balance: TextView) {
-        WalletApi.getWallet(object : WalletApi.Callback<WalletBalance> {
-            override fun onSuccess(value: WalletBalance) {
-                runOnUiThread {
-                    balance.text =
-                        "🪙 ${value.coins} Coins\n💎 ${value.pearls} Pearls"
-                }
-            }
-
-            override fun onError(message: String) {
-                runOnUiThread {
-                    balance.text = message
-                }
-            }
-        })
+        setContentView(root)
     }
 
     // PROFILE EDITING
@@ -636,83 +673,114 @@ class MainActivity : Activity() {
     private fun showProfile() {
         currentFeature = "My Profile"
 
-        val screen = page("My Profile")
+        try {
+            val screen = page("My Profile")
 
-        val photoBox = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(18), dp(20), dp(18), dp(20))
-            background = cardBackground()
-        }
-
-        profileImage = ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(100), dp(100))
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            background = circleBackground()
-            clipToOutline = true
-        }
-
-        photoBox.addView(profileImage)
-
-        loadLocalPhoto()?.let {
-            showPhoto(it)
-        }
-
-        photoBox.addView(
-            button("Change Profile Photo") {
-                choosePhoto()
-            },
-            LinearLayout.LayoutParams(-1, dp(48)).apply {
-                topMargin = dp(12)
+            val photoBox = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setPadding(dp(18), dp(20), dp(18), dp(20))
+                background = cardBackground()
             }
-        )
 
-        screen.addView(
-            photoBox,
-            LinearLayout.LayoutParams(-1, -2).apply {
-                topMargin = dp(18)
+            profileImage = ImageView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(100), dp(100))
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                background = circleBackground()
+                clipToOutline = true
             }
-        )
 
-        val user = auth.currentUser
+            photoBox.addView(profileImage)
 
-        screen.addView(
-            infoCard("USER ID", user?.uid ?: "Not signed in"),
-            LinearLayout.LayoutParams(-1, -2).apply {
-                topMargin = dp(14)
+            loadLocalPhoto()?.let {
+                showPhoto(it)
             }
-        )
 
-        profileName = inputField("Profile name")
-        profileCountry = inputField("Country")
-        profileAge = inputField("Age")
+            photoBox.addView(
+                button("CHANGE PROFILE PHOTO") {
+                    choosePhoto()
+                },
+                LinearLayout.LayoutParams(-1, dp(48)).apply {
+                    topMargin = dp(12)
+                }
+            )
 
-        profileGender = text("Select gender  ›", 15f, white, true).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(14), 0, dp(14), 0)
-            background = fieldBackground()
-            isClickable = true
-            setOnClickListener { chooseGender() }
+            screen.addView(
+                photoBox,
+                LinearLayout.LayoutParams(-1, -2).apply {
+                    topMargin = dp(15)
+                }
+            )
+
+            val user = auth.currentUser
+
+            profileStatus = text("Loading account ID...", 14f, cyan, true)
+
+            screen.addView(
+                profileStatus,
+                LinearLayout.LayoutParams(-1, -2).apply {
+                    topMargin = dp(15)
+                }
+            )
+
+            if (user != null) {
+                db.collection("users").document(user.uid)
+                    .get()
+                    .addOnSuccessListener { doc ->
+                        if (!isFinishing && !isDestroyed &&
+                            ::profileStatus.isInitialized
+                        ) {
+                            val numericId = doc.getLong("numericId")
+                            profileStatus.text = if (numericId != null) {
+                                "KINGDOM USER ID: $numericId"
+                            } else {
+                                "User ID is being generated..."
+                            }
+                        }
+                    }
+            }
+
+            profileName = inputField("Profile name")
+            profileCountry = inputField("Country")
+            profileAge = inputField("Age")
+
+            profileGender = text(
+                "Select gender  ›",
+                15f,
+                white,
+                true
+            ).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(14), 0, dp(14), 0)
+                background = fieldBackground()
+                isClickable = true
+                setOnClickListener { chooseGender() }
+            }
+
+            section(screen, "Personal Information", "EDIT DETAILS")
+
+            addLabeledField(screen, "Name", profileName)
+            addLabeledField(screen, "Country", profileCountry)
+            addLabeledField(screen, "Age", profileAge)
+            addLabeledView(screen, "Gender", profileGender)
+
+            screen.addView(
+                button("SAVE PROFILE") {
+                    saveProfile()
+                },
+                LinearLayout.LayoutParams(-1, dp(52)).apply {
+                    topMargin = dp(20)
+                }
+            )
+
+            setContentView(screen)
+            loadProfile()
+
+        } catch (e: Exception) {
+            currentFeature = null
+            notice("Profile screen error: ${e.localizedMessage}")
+            showProfileMenu()
         }
-
-        section(screen, "Personal Information", "EDIT DETAILS")
-
-        addLabeledField(screen, "Name", profileName)
-        addLabeledField(screen, "Country", profileCountry)
-        addLabeledField(screen, "Age", profileAge)
-        addLabeledView(screen, "Gender", profileGender)
-
-        screen.addView(
-            button("SAVE PROFILE") {
-                saveProfile()
-            },
-            LinearLayout.LayoutParams(-1, dp(52)).apply {
-                topMargin = dp(20)
-            }
-        )
-
-        setContentView(screen)
-        loadProfile()
     }
 
     private fun loadProfile() {
@@ -721,17 +789,30 @@ class MainActivity : Activity() {
         db.collection("users").document(uid)
             .get()
             .addOnSuccessListener { doc ->
+
+                if (isFinishing || isDestroyed) return@addOnSuccessListener
+                if (!::profileName.isInitialized ||
+                    !::profileCountry.isInitialized ||
+                    !::profileAge.isInitialized ||
+                    !::profileGender.isInitialized
+                ) return@addOnSuccessListener
+
                 if (!doc.exists()) return@addOnSuccessListener
 
                 profileName.setText(doc.getString("name") ?: "")
                 profileCountry.setText(doc.getString("country") ?: "")
-                profileAge.setText(doc.getLong("age")?.toString() ?: "")
+
+                val age = doc.get("age")
+                profileAge.setText(age?.toString() ?: "")
 
                 selectedGender = doc.getString("gender") ?: ""
 
                 profileGender.text =
-                    if (selectedGender.isBlank()) "Select gender  ›"
-                    else "$selectedGender  ›"
+                    if (selectedGender.isBlank()) {
+                        "Select gender  ›"
+                    } else {
+                        "$selectedGender  ›"
+                    }
 
                 syncPublicProfile(
                     doc.getString("name") ?: "",
@@ -745,6 +826,7 @@ class MainActivity : Activity() {
 
     private fun saveProfile() {
         val uid = auth.currentUser?.uid ?: return
+
         val name = profileName.text.toString().trim()
         val country = profileCountry.text.toString().trim()
         val ageText = profileAge.text.toString().trim()
@@ -767,10 +849,12 @@ class MainActivity : Activity() {
             "updatedAt" to FieldValue.serverTimestamp()
         )
 
-        if (age != null) data["age"] = age
+        if (age != null) {
+            data["age"] = age
+        }
 
         db.collection("users").document(uid)
-            .set(data)
+            .set(data, com.google.firebase.firestore.SetOptions.merge())
             .addOnSuccessListener {
                 syncPublicProfile(name, country)
                 notice("Profile saved successfully")
@@ -797,7 +881,10 @@ class MainActivity : Activity() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "image/*"
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
         }
+
         startActivityForResult(intent, PHOTO_REQUEST)
     }
 
@@ -848,6 +935,154 @@ class MainActivity : Activity() {
         }
     }
 
+    // USER SEARCH BY NUMERIC ID
+
+    private fun showUserSearch() {
+        currentFeature = "Search User"
+
+        val screen = page("Search User")
+        val searchInput = inputField("Enter numeric User ID")
+
+        val resultBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        screen.addView(
+            text("Search Kingdom users by their numeric ID.", 14f, muted, false)
+        )
+
+        screen.addView(
+            searchInput,
+            LinearLayout.LayoutParams(-1, dp(52)).apply {
+                topMargin = dp(15)
+            }
+        )
+
+        screen.addView(
+            button("SEARCH USER") {
+                val id = searchInput.text.toString().trim().toLongOrNull()
+
+                if (id == null) {
+                    notice("Enter a valid numeric User ID")
+                    return@button
+                }
+
+                resultBox.removeAllViews()
+                resultBox.addView(
+                    text("Searching...", 14f, muted, false)
+                )
+
+                db.collection("publicProfiles")
+                    .whereEqualTo("numericId", id)
+                    .limit(1)
+                    .get()
+                    .addOnSuccessListener { result ->
+
+                        resultBox.removeAllViews()
+
+                        if (result.isEmpty) {
+                            resultBox.addView(
+                                text("User not found.", 14f, pink, false)
+                            )
+                            return@addOnSuccessListener
+                        }
+
+                        val doc = result.documents.first()
+                        val name = doc.getString("name") ?: "Kingdom User"
+                        val uid = doc.id
+
+                        resultBox.addView(
+                            tile(
+                                "👤",
+                                "$name\nID: $id",
+                                cyan
+                            ) {
+                                showPublicUserProfile(uid, name, id)
+                            }
+                        )
+                    }
+                    .addOnFailureListener {
+                        resultBox.removeAllViews()
+                        resultBox.addView(
+                            text(
+                                "Search failed: ${it.localizedMessage}",
+                                14f,
+                                pink,
+                                false
+                            )
+                        )
+                    }
+            },
+            LinearLayout.LayoutParams(-1, dp(50)).apply {
+                topMargin = dp(10)
+            }
+        )
+
+        screen.addView(
+            resultBox,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(18)
+            }
+        )
+
+        setContentView(screen)
+    }
+
+    private fun showPublicUserProfile(
+        uid: String,
+        name: String,
+        numericId: Long
+    ) {
+        val myUid = auth.currentUser?.uid ?: return
+
+        if (uid == myUid) {
+            showProfile()
+            return
+        }
+
+        val screen = page("User Profile")
+
+        screen.addView(
+            infoCard("USER NAME", name)
+        )
+
+        screen.addView(
+            infoCard("KINGDOM USER ID", numericId.toString()),
+            LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(10)
+            }
+        )
+
+        val followButton = button("CHECK FOLLOW STATUS") {}
+
+        screen.addView(
+            followButton,
+            LinearLayout.LayoutParams(-1, dp(48)).apply {
+                topMargin = dp(15)
+            }
+        )
+
+        setContentView(screen)
+
+        val followRef = db.collection("follows")
+            .document(myUid)
+            .collection("following")
+            .document(uid)
+
+        followRef.get().addOnSuccessListener { doc ->
+
+            val following = doc.exists()
+
+            followButton.text = if (following) "UNFOLLOW" else "FOLLOW"
+
+            followButton.setOnClickListener {
+                changeFollow(uid, following) {
+                    showPublicUserProfile(uid, name, numericId)
+                }
+            }
+        }
+    }
+
     // FOLLOWERS
 
     private fun showPeople(chatOnly: Boolean) {
@@ -861,13 +1096,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
         }
 
-        screen.addView(
-            list,
-            LinearLayout.LayoutParams(-1, -2).apply {
-                topMargin = dp(12)
-            }
-        )
-
+        screen.addView(list)
         setContentView(screen)
 
         val myUid = auth.currentUser?.uid ?: return
@@ -875,6 +1104,9 @@ class MainActivity : Activity() {
         db.collection("publicProfiles")
             .get()
             .addOnSuccessListener { result ->
+
+                if (isFinishing || isDestroyed) return@addOnSuccessListener
+
                 list.removeAllViews()
 
                 for (doc in result.documents) {
@@ -882,7 +1114,7 @@ class MainActivity : Activity() {
                     if (targetId == myUid) continue
 
                     val name = doc.getString("name") ?: "User"
-                    val country = doc.getString("country") ?: ""
+                    val numericId = doc.getLong("numericId")
 
                     db.collection("follows")
                         .document(myUid)
@@ -902,6 +1134,13 @@ class MainActivity : Activity() {
                                     val mutual = following && theirFollow.exists()
 
                                     if (chatOnly && !mutual) return@second
+                                    if (isFinishing || isDestroyed) return@second
+
+                                    val label = if (numericId != null) {
+                                        "$name\nID: $numericId"
+                                    } else {
+                                        name
+                                    }
 
                                     val userCard = LinearLayout(this).apply {
                                         orientation = LinearLayout.VERTICAL
@@ -910,14 +1149,8 @@ class MainActivity : Activity() {
                                     }
 
                                     userCard.addView(
-                                        text(name, 17f, white, true)
+                                        text(label, 16f, white, true)
                                     )
-
-                                    if (country.isNotBlank()) {
-                                        userCard.addView(
-                                            text(country, 13f, muted, false)
-                                        )
-                                    }
 
                                     val actions = LinearLayout(this).apply {
                                         orientation = LinearLayout.HORIZONTAL
@@ -1005,7 +1238,7 @@ class MainActivity : Activity() {
         }
     }
 
-    // CHAT
+    // PRIVATE CHAT
 
     private fun openChat(otherUid: String, otherName: String) {
         val myUid = auth.currentUser?.uid ?: return
@@ -1025,52 +1258,45 @@ class MainActivity : Activity() {
             .document(myUid)
 
         myFollow.get().addOnSuccessListener first@{ first ->
+
             if (!first.exists()) {
                 notice("You both must follow each other to chat")
                 return@first
             }
 
             theirFollow.get().addOnSuccessListener second@{ second ->
+
                 if (!second.exists()) {
                     notice("You both must follow each other to chat")
                     return@second
                 }
 
-                db.collection("chats").document(chatId)
-                    .get()
-                    .addOnSuccessListener check@{ existing ->
+                val chatRef = db.collection("chats").document(chatId)
+
+                chatRef.get()
+                    .addOnSuccessListener { existing ->
+
                         if (existing.exists()) {
                             showChatScreen(chatId, otherName)
                         } else {
-                            val data = mapOf(
-                                "memberIds" to members,
-                                "createdAt" to FieldValue.serverTimestamp()
-                            )
-
-                            db.collection("chats").document(chatId)
-                                .set(data)
-                                .addOnSuccessListener {
-                                    showChatScreen(chatId, otherName)
-                                }
-                                .addOnFailureListener {
-                                    notice("Could not start chat: ${it.localizedMessage}")
-                                }
+                            chatRef.set(
+                                mapOf(
+                                    "memberIds" to members,
+                                    "createdAt" to FieldValue.serverTimestamp()
+                                )
+                            ).addOnSuccessListener {
+                                showChatScreen(chatId, otherName)
+                            }.addOnFailureListener {
+                                notice("Could not start chat: ${it.localizedMessage}")
+                            }
                         }
                     }
-                    .addOnFailureListener {
-                        notice("Chat access failed: ${it.localizedMessage}")
-                    }
-            }.addOnFailureListener {
-                notice("Follow check failed: ${it.localizedMessage}")
             }
-        }.addOnFailureListener {
-            notice("Follow check failed: ${it.localizedMessage}")
         }
     }
 
     private fun showChatScreen(chatId: String, otherName: String) {
-        currentFeature = "Chat Messages"
-        activeChatId = chatId
+        currentFeature = "Chat"
 
         chatListener?.remove()
         chatListener = null
@@ -1113,7 +1339,11 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
         }
 
-        composer.addView(input, LinearLayout.LayoutParams(0, dp(52), 1f))
+        composer.addView(
+            input,
+            LinearLayout.LayoutParams(0, dp(52), 1f)
+        )
+
         composer.addView(
             button("SEND") {
                 sendMessage(chatId, input.text.toString(), input)
@@ -1183,6 +1413,8 @@ class MainActivity : Activity() {
                     return@addSnapshotListener
                 }
 
+                if (isFinishing || isDestroyed) return@addSnapshotListener
+
                 messagesView.removeAllViews()
 
                 snapshot?.documents?.forEach { doc ->
@@ -1216,6 +1448,59 @@ class MainActivity : Activity() {
                     chatScroll?.fullScroll(View.FOCUS_DOWN)
                 }
             }
+    }
+
+    // WALLET
+
+    private fun showWallet() {
+        currentFeature = "Wallet"
+
+        val screen = page("My Wallet")
+        val balance = text("Loading wallet...", 19f, white, true)
+
+        screen.addView(
+            infoCard("YOUR WALLET", "Your current account balance")
+        )
+
+        screen.addView(
+            balance,
+            LinearLayout.LayoutParams(-1, dp(100)).apply {
+                topMargin = dp(15)
+            }
+        )
+
+        screen.addView(
+            button("REFRESH BALANCE") {
+                loadWalletBalance(balance)
+            },
+            LinearLayout.LayoutParams(-1, dp(50)).apply {
+                topMargin = dp(12)
+            }
+        )
+
+        setContentView(screen)
+        loadWalletBalance(balance)
+    }
+
+    private fun loadWalletBalance(balance: TextView) {
+        WalletApi.getWallet(object : WalletApi.Callback<WalletBalance> {
+            override fun onSuccess(value: WalletBalance) {
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed) {
+                        balance.text =
+                            "🪙 ${value.coins} Coins\n💎 ${value.pearls} Pearls"
+                    }
+                }
+            }
+
+            override fun onError(message: String) {
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed) {
+                        balance.text = message
+                    }
+                }
+            }
+        })
     }
 
     // ACCOUNT SETTINGS
@@ -1310,7 +1595,6 @@ class MainActivity : Activity() {
                 chatListener?.remove()
                 chatListener = null
                 auth.signOut()
-                notice("Signed out")
                 finish()
             }
             .show()
@@ -1325,6 +1609,7 @@ class MainActivity : Activity() {
             )
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Continue") { _, _ ->
+
                 val user = auth.currentUser
 
                 if (user == null) {
@@ -1336,7 +1621,6 @@ class MainActivity : Activity() {
                     .addOnSuccessListener {
                         chatListener?.remove()
                         chatListener = null
-                        notice("Account deleted")
                         finish()
                     }
                     .addOnFailureListener {
@@ -1350,6 +1634,7 @@ class MainActivity : Activity() {
 
     private fun showSimpleScreen(title: String, message: String) {
         currentFeature = title
+
         val screen = page(title)
 
         screen.addView(
@@ -1382,6 +1667,7 @@ class MainActivity : Activity() {
         }
 
         top.addView(back, LinearLayout.LayoutParams(dp(42), dp(48)))
+
         top.addView(
             text(title, 21f, white, true),
             LinearLayout.LayoutParams(0, -2, 1f)
