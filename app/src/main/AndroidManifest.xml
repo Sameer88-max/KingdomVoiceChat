@@ -21,6 +21,11 @@
             android:name=".OwnerPanelActivity"
             android:exported="false" />
 
+        <!-- Theme Settings Activity -->
+        <activity
+            android:name=".ThemeSettingsActivity"
+            android:exported="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="false" />
