@@ -544,7 +544,24 @@ return
 
         setContentView(root)
     }
+private fun openCreateRoom() {
+    CreateRoomDialog(this) { name, id -> createDraftRoom(name, id) }.show()
+}
 
+private fun createDraftRoom(name: String, id: String) {
+    if (draftRooms.any { it.roomId == id }) { notice("Room ID already exists"); return }
+    val user = auth.currentUser
+    draftRooms.add(RoomModel(id, name, user?.uid ?: "", user?.email?.substringBefore("@") ?: "Kingdom User", onlineCount = 1, isOnline = true))
+    notice("Room created")
+    showTab("Rooms")
+}
+
+private fun showRoomSearch() {
+    RoomSearchDialog(this) { query ->
+        val room = draftRooms.find { it.roomId.equals(query, true) }
+        if (room != null) enterRoom(room.roomId) else notice("Room not found")
+    }.show()
+}
     // PROFILE SCREEN
 
     private fun showProfileMenu() {
