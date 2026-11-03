@@ -385,7 +385,7 @@ addTopHeader(content, true)
 content.addView(RoomsScreen(this, draftRooms, { openCreateRoom() }, { showRoomSearch() }) { enterRoom(it.roomId) }.build())
 setContentView(root)
 return
-        val (root, content) = appRoot()
+        {val (root, content) = appRoot()
 
         addTopHeader(content, true)
 
