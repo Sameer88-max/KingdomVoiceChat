@@ -152,7 +152,9 @@ class MainActivity : Activity() {
         return root to content
     }
 
-    private fun bottomNavigation(): LinearLayout {
+    private fun bottomNavigation(): LinearLayout {return BottomNavigation(this, currentTab) {
+    showTab(it)
+}.build()
         val nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
