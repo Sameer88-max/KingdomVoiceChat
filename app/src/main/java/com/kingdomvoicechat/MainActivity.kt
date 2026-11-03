@@ -34,6 +34,7 @@ class MainActivity : Activity() {
     private val muted = Color.rgb(184, 199, 235)
 
     private var currentTab = "Home"
+    private val draftRooms = mutableListOf<RoomModel>()
     private var currentFeature: String? = null
     private var selectedGender = "Not specified"
 
