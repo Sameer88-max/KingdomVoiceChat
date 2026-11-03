@@ -1729,19 +1729,22 @@ class MainActivity : Activity() {
     }
 
     private fun rounded(
-        colors: IntArray,
-        radius: Int,
-        stroke: Int,
-        strokeWidth: Int
-    ): GradientDrawable {
-        return GradientDrawable(
-            GradientDrawable.Orientation.TL_BR,
-            colors
-        ).apply {
-            cornerRadius = dp(radius).toFloat()
+    colors: IntArray,
+    radius: Int,
+    stroke: Int = Color.TRANSPARENT,
+    strokeWidth: Int = 0
+): GradientDrawable {
+    return GradientDrawable(
+        GradientDrawable.Orientation.TL_BR,
+        colors
+    ).apply {
+        cornerRadius = dp(radius).toFloat()
+
+        if (strokeWidth > 0) {
             setStroke(dp(strokeWidth), stroke)
         }
     }
+}
 
     private fun circleBackground(): GradientDrawable {
         return GradientDrawable().apply {
