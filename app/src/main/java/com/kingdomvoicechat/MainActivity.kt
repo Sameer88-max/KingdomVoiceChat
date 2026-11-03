@@ -236,6 +236,7 @@ addTopHeader(content, true)
 content.addView(HomeScreen(this, { openCreateRoom() }, { showRoomSearch() }).build())
 setContentView(root)
 return
+        {
         val (root, content) = appRoot()
 
         addTopHeader(content, true)
