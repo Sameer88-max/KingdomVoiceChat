@@ -582,7 +582,12 @@ class MainActivity : Activity() {
         )
 
         details.addView(
-            text("⭐  Lv.1      ▰▰▰▱  68%", 13f, Color.MAGENTA, true)
+            text(
+    "⭐ Level ${UserLevel.newUser().level}      XP ${UserLevel.newUser().xp}",
+    13f,
+    Color.MAGENTA,
+    true
+)
         )
 
         details.addView(
