@@ -373,7 +373,11 @@ class MainActivity : Activity() {
 
     // ROOMS SCREEN
 
-    private fun showRooms() {
+    private fun showRooms() {val (root, content) = appRoot()
+addTopHeader(content, true)
+content.addView(RoomsScreen(this, draftRooms, { openCreateRoom() }, { showRoomSearch() }) { enterRoom(it.roomId) }.build())
+setContentView(root)
+return
         val (root, content) = appRoot()
 
         addTopHeader(content, true)
