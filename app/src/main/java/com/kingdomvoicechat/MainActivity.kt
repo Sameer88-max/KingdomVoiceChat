@@ -229,7 +229,11 @@ class MainActivity : Activity() {
 
     // HOME SCREEN
 
-    private fun showHome() {
+    private fun showHome() {val (root, content) = appRoot()
+addTopHeader(content, true)
+content.addView(HomeScreen(this, { openCreateRoom() }, { showRoomSearch() }).build())
+setContentView(root)
+return
         val (root, content) = appRoot()
 
         addTopHeader(content, true)
