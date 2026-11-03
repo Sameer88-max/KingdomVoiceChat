@@ -1508,49 +1508,49 @@ class MainActivity : Activity() {
     }
 
     private fun addChatRow(
-        parent: LinearLayout,
-        name: String,
-        message: String,
-        icon: String,
-        unread: String,
-        action: () -> Unit
-    ) {
-        val row = neonCard().apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(10), dp(12), dp(10), dp(12))
-            setOnClickListener { action() }
-        }
-
-        row.addView(text(icon, 35f, cyan, true))
-
-        val labels = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(10), 0, 0, 0)
-        }
-
-        labels.addView(text(name, 15f, white, true))
-        labels.addView(text(message, 12f, muted))
-
-        row.addView(
-            labels,
-            LinearLayout.LayoutParams(0, -2, 1f)
-        )
-
-        if (unread.isNotEmpty()) {
-            row.addView(
-                text(unread, 14f, white, true).apply {
-                    background = rounded(
-                        intArrayOf(Color.RED, Color.rgb(210, 20, 60)),
-                        30
-                    )
-                    setPadding(dp(9), dp(5), dp(9), dp(5))
-                }
-            )
-        }
-
-        parent.addView(row, matchWrap(top = 8))
+    parent: LinearLayout,
+    name: String,
+    message: String,
+    icon: String,
+    unread: String,
+    action: () -> Unit
+) {
+    val row = neonCard().apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(10), dp(12), dp(10), dp(12))
+        setOnClickListener { action() }
     }
+
+    row.addView(text(icon, 35f, cyan, true))
+
+    val labels = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(10), 0, 0, 0)
+    }
+
+    labels.addView(text(name, 15f, white, true))
+    labels.addView(text(message, 12f, muted))
+
+    row.addView(
+        labels,
+        LinearLayout.LayoutParams(0, -2, 1f)
+    )
+
+    if (unread.isNotEmpty()) {
+        row.addView(
+            text(unread, 14f, white, true).apply {
+                background = rounded(
+                    intArrayOf(Color.RED, Color.rgb(210, 20, 60)),
+                    30
+                )
+                setPadding(dp(9), dp(5), dp(9), dp(5))
+            }
+        )
+    }
+
+    parent.addView(row, matchWrap(top = 8))
+}
 
     private fun addProfileOption(
         parent: LinearLayout,
