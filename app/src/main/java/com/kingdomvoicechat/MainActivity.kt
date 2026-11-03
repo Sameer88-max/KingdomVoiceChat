@@ -448,7 +448,11 @@ class MainActivity : Activity() {
 
     // MESSAGES SCREEN
 
-    private fun showMessages() {
+    private fun showMessages() {val (root, content) = appRoot()
+addTopHeader(content, true)
+content.addView(MessagesScreen(this).build())
+setContentView(root)
+return
         val (root, content) = appRoot()
 
         addTopHeader(content, true)
