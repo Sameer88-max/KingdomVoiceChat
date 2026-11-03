@@ -464,6 +464,7 @@ addTopHeader(content, true)
 content.addView(MessagesScreen(this).build())
 setContentView(root)
 return
+        {
         val (root, content) = appRoot()
 
         addTopHeader(content, true)
