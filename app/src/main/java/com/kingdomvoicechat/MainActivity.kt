@@ -556,6 +556,7 @@ return
         setContentView(root)
     }
      */
+     */
 private fun openCreateRoom() {
     CreateRoomDialog(this) { name, id -> createDraftRoom(name, id) }.show()
 }
