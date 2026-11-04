@@ -458,7 +458,7 @@ return
             content.addView(row, matchWrap(top = 10))
         }
         */
-        setContentView(root)//
+       //   setContentView(root)//
     }
 
     // MESSAGES SCREEN
