@@ -11,7 +11,7 @@ class RoomSearchDialog(
     fun show() {
         val input = EditText(context).apply {
             hint = "Enter User ID or Room ID"
-            singleLine = true
+            setSingleLine(true)
         }
 
         AlertDialog.Builder(context)
