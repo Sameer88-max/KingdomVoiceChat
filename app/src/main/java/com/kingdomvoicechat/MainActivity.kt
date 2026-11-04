@@ -378,7 +378,7 @@ return
 
         content.addView(rewards, matchWrap(top = 18))
 */
-        setContentView(root)
+        setContentView(root) // l
     }
 
     // ROOMS SCREEN
@@ -388,6 +388,7 @@ addTopHeader(content, true)
 content.addView(RoomsScreen(this, draftRooms, { openCreateRoom() }, { showRoomSearch() }) { enterRoom(it.roomId) }.build())
 setContentView(root)
 return
+        /*
         {val (root, content) = appRoot()
 
         addTopHeader(content, true)
@@ -457,7 +458,7 @@ return
             content.addView(row, matchWrap(top = 10))
         }
         */
-        setContentView(root)
+        setContentView(root)//
     }
 
     // MESSAGES SCREEN
