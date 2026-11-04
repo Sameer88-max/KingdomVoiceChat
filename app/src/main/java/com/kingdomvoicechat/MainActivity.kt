@@ -236,6 +236,8 @@ addTopHeader(content, true)
 content.addView(HomeScreen(this, { openCreateRoom() }, { showRoomSearch() }).build())
 setContentView(root)
 return
+        }
+ /*
         {
         val (root, content) = appRoot()
 
@@ -334,8 +336,9 @@ return
                     showTab("Rooms")
                 },
                 weighted()
-            )
+         )
         }
+        
 
         content.addView(popular, matchWrap(top = 8))
 
@@ -374,7 +377,7 @@ return
         )
 
         content.addView(rewards, matchWrap(top = 18))
-
+*/
         setContentView(root)
     }
 
@@ -453,7 +456,7 @@ return
 
             content.addView(row, matchWrap(top = 10))
         }
-
+        */
         setContentView(root)
     }
 
@@ -464,6 +467,8 @@ addTopHeader(content, true)
 content.addView(MessagesScreen(this).build())
 setContentView(root)
 return
+        }
+ /*
         {
         val (root, content) = appRoot()
 
@@ -541,6 +546,7 @@ return
                     chat.first,
                     "Conversation UI will appear here after the chat backend is connected."
                 )
+                */
             }
         }
 
