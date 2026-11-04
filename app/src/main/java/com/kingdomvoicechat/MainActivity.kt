@@ -11,7 +11,6 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.widget.*
-setSingleLine(true)
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -153,426 +152,61 @@ class MainActivity : Activity() {
         return root to content
     }
 
-    private fun bottomNavigation(): LinearLayout {return BottomNavigation(this, currentTab) {
-    showTab(it)
-}.build()
-        val nav = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setPadding(dp(7), dp(7), dp(7), dp(7))
-            background = rounded(
-                intArrayOf(
-                    Color.rgb(8, 15, 54),
-                    Color.rgb(13, 25, 75)
-                ),
-                28,
-                cyan,
-                1
-            )
-        }
-
-        listOf(
-            "⌂" to "Home",
-            "🎙" to "Rooms",
-            "✉" to "Messages",
-            "♙" to "Profile"
-        ).forEach { item ->
-
-            val active = currentTab == item.second
-
-            val cell = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER
-                setPadding(dp(4), dp(7), dp(4), dp(7))
-
-                if (active) {
-                    background = rounded(
-                        intArrayOf(
-                            Color.rgb(8, 95, 190),
-                            Color.rgb(13, 35, 105)
-                        ),
-                        22,
-                        cyan,
-                        1
-                    )
-                }
-
-                isClickable = true
-                setOnClickListener {
-                    showTab(item.second)
-                }
-            }
-
-            cell.addView(
-                text(
-                    item.first,
-                    24f,
-                    if (active) cyan else muted,
-                    true
-                )
-            )
-
-            cell.addView(
-                text(
-                    item.second,
-                    11f,
-                    if (active) cyan else muted,
-                    true
-                )
-            )
-
-            nav.addView(
-                cell,
-                LinearLayout.LayoutParams(0, dp(62), 1f)
-            )
-        }
-
-        return nav
+    private fun bottomNavigation(): LinearLayout {
+        return BottomNavigation(this, currentTab) {
+            showTab(it)
+        }.build()
     }
 
     // HOME SCREEN
 
-    private fun showHome() {val (root, content) = appRoot()
-addTopHeader(content, true)
-content.addView(HomeScreen(this, { openCreateRoom() }, { showRoomSearch() }).build())
-setContentView(root)
-return
-        }
- /*
-        {
+    private fun showHome() {
         val (root, content) = appRoot()
-
         addTopHeader(content, true)
-
-        val banner = neonCard().apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(14), dp(18), dp(14), dp(18))
-        }
-
-        banner.addView(text("🎙", 48f, cyan, true))
-
-        val copy = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(10), 0, 0, 0)
-        }
-
-        copy.addView(text("Welcome to", 18f, white, true))
-        copy.addView(text("Kingdom Voice Chat", 23f, cyan, true))
-        copy.addView(text("Sing • Chat • Make Friends", 12f, white))
-
-        banner.addView(copy)
-        banner.addView(text("👑", 42f, Color.YELLOW, true))
-
-        content.addView(banner, matchWrap(top = 12))
-
-        section(content, "🔥  Live Rooms", "See All") {
-            showTab("Rooms")
-        }
-
-        val live = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-
-        live.addView(
-            roomMiniCard(
-                "Music Forever",
-                "Saba Melody",
-                "505",
-                "23.5K",
-                "🎵"
-            ) {
-                enterRoom("505")
-            },
-            weighted()
-        )
-
-        live.addView(
-            roomMiniCard(
-                "Sing Together",
-                "Sameer ZS",
-                "821",
-                "18.7K",
-                "🎤"
-            ) {
-                enterRoom("821")
-            },
-            weighted()
-        )
-
-        live.addView(
-            roomMiniCard(
-                "Fun & Chat",
-                "Zeba Sameer",
-                "505",
-                "12.9K",
-                "💬"
-            ) {
-                enterRoom("505")
-            },
-            weighted()
-        )
-
-        content.addView(live, matchWrap(top = 8))
-
-        section(content, "⭐  Popular Rooms", "See All") {
-            showTab("Rooms")
-        }
-
-        val popular = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-
-        listOf(
-            Triple("Star Singer Club", "8.2K Online", "🎙"),
-            Triple("Royal Family", "6.7K Online", "👑"),
-            Triple("Music Mania", "5.9K Online", "🎶")
-        ).forEach { item ->
-            popular.addView(
-                popularCard(
-                    item.first,
-                    item.second,
-                    item.third
-                ) {
-                    showTab("Rooms")
-                },
-                weighted()
-         )
-        }
-        
-
-        content.addView(popular, matchWrap(top = 8))
-
-        val rewards = neonCard().apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(14), dp(15), dp(14), dp(15))
-        }
-
-        rewards.addView(text("🎁", 42f, Color.YELLOW, true))
-
-        val rewardText = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(10), 0, dp(8), 0)
-        }
-
-        rewardText.addView(
-            text("Daily Rewards", 19f, Color.YELLOW, true)
-        )
-
-        rewardText.addView(
-            text("Login daily & get free coins!", 12f, white)
-        )
-
-        rewards.addView(
-            rewardText,
-            LinearLayout.LayoutParams(0, -2, 1f)
-        )
-
-        rewards.addView(
-            button("Claim Now") {
-                notice(
-                    "Daily rewards will be available when rewards service is connected."
-                )
-            }
-        )
-
-        content.addView(rewards, matchWrap(top = 18))
-// /*
-        setContentView(root) // l
+        content.addView(HomeScreen(this, { openCreateRoom() }, { showRoomSearch() }).build())
+        setContentView(root)
     }
-*/
+
     // ROOMS SCREEN
 
-    private fun showRooms() {val (root, content) = appRoot()
-addTopHeader(content, true)
-content.addView(RoomsScreen(this, draftRooms, { openCreateRoom() }, { showRoomSearch() }) { enterRoom(it.roomId) }.build())
-setContentView(root)
-return
-        /*
-        {val (root, content) = appRoot()
-
+    private fun showRooms() {
+        val (root, content) = appRoot()
         addTopHeader(content, true)
-
-        content.addView(
-            neonBanner(
-                "🎙",
-                "Join Amazing",
-                "Voice Rooms",
-                "Sing • Chat • Make Friends"
-            ),
-            matchWrap(top = 10)
-        )
-
-        val filters = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-
-        listOf(
-            "All Rooms",
-            "Singing",
-            "Gaming",
-            "Fun",
-            "Quiz"
-        ).forEachIndexed { index, label ->
-            filters.addView(
-                chip(label, index == 0) {
-                    notice("$label rooms selected")
-                },
-                weighted()
-            )
-        }
-
-        content.addView(filters, matchWrap(top = 12))
-
-        val grid = listOf(
-            Triple("Music Lovers Club", "Sing & Enjoy Together", "505"),
-            Triple("Gaming Zone", "Play • Chat • Fun", "821"),
-            Triple("Fun Time Club", "Laugh • Chat • Chill", "505"),
-            Triple("Quiz Challenge", "Test Your Knowledge", "821"),
-            Triple("Music Mania", "Best Songs & Vibes", "505"),
-            Triple("StarLeo Concert", "Sing Like a Star", "821")
-        )
-
-        grid.chunked(2).forEach { pair ->
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-            }
-
-            pair.forEach { item ->
-                row.addView(
-                    roomLargeCard(
-                        item.first,
-                        item.second,
-                        item.third
-                    ) {
-                        enterRoom(item.third)
-                    },
-                    weighted()
-                )
-            }
-
-            if (pair.size == 1) {
-                row.addView(View(this), weighted())
-            }
-
-            content.addView(row, matchWrap(top = 10))
-        }
-        */
-       //   setContentView(root)//
+        content.addView(RoomsScreen(this, draftRooms, { openCreateRoom() }, { showRoomSearch() }) { enterRoom(it.roomId) }.build())
+        setContentView(root)
     }
 
     // MESSAGES SCREEN
 
-    private fun showMessages() {val (root, content) = appRoot()
-addTopHeader(content, true)
-content.addView(MessagesScreen(this).build())
-setContentView(root)
-return
-        }
- /*
-        {
+    private fun showMessages() {
         val (root, content) = appRoot()
-
         addTopHeader(content, true)
-
-        content.addView(
-            neonBanner(
-                "💬",
-                "Stay Connected",
-                "Chat & Messages",
-                "Make Friends • Share Moments"
-            ),
-            matchWrap(top = 10)
-        )
-
-        val tabs = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-
-        listOf(
-            "All Chats",
-            "Friends",
-            "Groups",
-            "System"
-        ).forEachIndexed { i, label ->
-            tabs.addView(
-                chip(label, i == 0) {
-                    notice("$label selected")
-                },
-                weighted()
-            )
-        }
-
-        content.addView(tabs, matchWrap(top = 12))
-
-        val search = EditText(this).apply {
-            hint = "⌕  Search chats, users, or room..."
-            setTextColor(white)
-            setHintTextColor(muted)
-            textSize = 14f
-            setPadding(dp(15), dp(12), dp(15), dp(12))
-            background = rounded(
-                intArrayOf(
-                    Color.rgb(10, 22, 72),
-                    Color.rgb(14, 28, 82)
-                ),
-                24,
-                Color.rgb(46, 75, 150),
-                1
-            )
-        }
-
-        content.addView(search, matchWrap(top = 12))
-
-        val chats = listOf(
-            Triple("King Sameer", "Hello bro! How are you?", "👑"),
-            Triple("Saba Melody", "Thank you for joining the room ❤️", "🎤"),
-            Triple("Room 821 Family", "Zeba Ansari: Good night everyone 🌙", "👥"),
-            Triple("Peter", "Bro, tomorrow live concert hai 👍", "🧑"),
-            Triple("Zeba Sameer Siddiqui", "Voice message (0:32)", "👑"),
-            Triple("Official Events", "New Event: One Day Singing Competition 🎉", "📢"),
-            Triple("Riya Khan", "Hahaha! Nice voice 😊", "👩"),
-            Triple("StarLeo Clan", "Welcome to StarLeo Concert House 821", "🦁")
-        )
-
-        chats.forEachIndexed { index, chat ->
-            addChatRow(
-                content,
-                chat.first,
-                chat.second,
-                chat.third,
-                if (index == 0 || index == 1) "1" else ""
-            ) {
-                showSimpleScreen(
-                    chat.first,
-                    "Conversation UI will appear here after the chat backend is connected."
-                )
-                 // /*
-            }
-        }
-
+        content.addView(MessagesScreen(this).build())
         setContentView(root)
     }
-     */
-private fun openCreateRoom() {
-    CreateRoomDialog(this) { name, id -> createDraftRoom(name, id) }.show()
-}
 
-private fun createDraftRoom(name: String, id: String) {
-    if (draftRooms.any { it.roomId == id }) { notice("Room ID already exists"); return }
-    val user = auth.currentUser
-    draftRooms.add(RoomModel(id, name, user?.uid ?: "", user?.email?.substringBefore("@") ?: "Kingdom User", onlineCount = 1, isOnline = true))
-    notice("Room created")
-    showTab("Rooms")
-}
+    private fun openCreateRoom() {
+        CreateRoomDialog(this) { name, id -> createDraftRoom(name, id) }.show()
+    }
 
-private fun showRoomSearch() {
-    RoomSearchDialog(this) { query ->
-        val room = draftRooms.find { it.roomId.equals(query, true) }
-        if (room != null) enterRoom(room.roomId) else notice("Room not found")
-    }.show()
-}
+    private fun createDraftRoom(name: String, id: String) {
+        if (draftRooms.any { it.roomId == id }) { 
+            notice("Room ID already exists")
+            return 
+        }
+        val user = auth.currentUser
+        draftRooms.add(RoomModel(id, name, user?.uid ?: "", user?.email?.substringBefore("@") ?: "Kingdom User", onlineCount = 1, isOnline = true))
+        notice("Room created")
+        showTab("Rooms")
+    }
+
+    private fun showRoomSearch() {
+        RoomSearchDialog(this) { query ->
+            val room = draftRooms.find { it.roomId.equals(query, true) }
+            if (room != null) enterRoom(room.roomId) else notice("Room not found")
+        }.show()
+    }
+
     // PROFILE SCREEN
 
     private fun showProfileMenu() {
@@ -626,11 +260,11 @@ private fun showRoomSearch() {
 
         details.addView(
             text(
-    "⭐ Level ${UserLevel.newUser().level}      XP ${UserLevel.newUser().xp}",
-    13f,
-    Color.MAGENTA,
-    true
-)
+                "⭐ Level ${UserLevel.newUser().level}      XP ${UserLevel.newUser().xp}",
+                13f,
+                Color.MAGENTA,
+                true
+            )
         )
 
         details.addView(
@@ -1426,180 +1060,6 @@ private fun showRoomSearch() {
         return root
     }
 
-    private fun section(
-        parent: LinearLayout,
-        title: String,
-        actionTitle: String? = null,
-        action: (() -> Unit)? = null
-    ) {
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(18), 0, dp(6))
-        }
-
-        row.addView(
-            text(title, 19f, white, true),
-            LinearLayout.LayoutParams(0, -2, 1f)
-        )
-
-        if (actionTitle != null) {
-            row.addView(
-                text("$actionTitle  ➜", 13f, cyan, true).apply {
-                    setOnClickListener {
-                        action?.invoke()
-                    }
-                }
-            )
-        }
-
-        parent.addView(row)
-    }
-
-    private fun roomMiniCard(
-        name: String,
-        host: String,
-        id: String,
-        viewers: String,
-        icon: String,
-        action: () -> Unit
-    ): LinearLayout {
-        val box = neonCard().apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(7), dp(10), dp(7), dp(10))
-            setOnClickListener { action() }
-        }
-
-        box.addView(text("🔴 LIVE", 10f, Color.RED, true))
-        box.addView(text(icon, 34f, cyan, true))
-        box.addView(text(name, 12f, white, true))
-        box.addView(text("👑 $host", 10f, muted))
-        box.addView(text("👥 $viewers", 10f, cyan, true))
-
-        box.addView(
-            button("Join") { action() },
-            matchWrap(top = 7)
-        )
-
-        return box
-    }
-
-    private fun popularCard(
-        name: String,
-        online: String,
-        icon: String,
-        action: () -> Unit
-    ): LinearLayout {
-        val box = neonCard().apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(6), dp(12), dp(6), dp(12))
-            setOnClickListener { action() }
-        }
-
-        box.addView(text(icon, 37f, cyan, true))
-        box.addView(text(name, 12f, white, true))
-        box.addView(text("🔥 $online", 10f, muted))
-
-        box.addView(
-            button("Join") { action() },
-            matchWrap(top = 8)
-        )
-
-        return box
-    }
-
-    private fun roomLargeCard(
-        name: String,
-        subtitle: String,
-        roomId: String,
-        action: () -> Unit
-    ): LinearLayout {
-        val box = neonCard().apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(10), dp(12), dp(10), dp(12))
-        }
-
-        box.addView(text("🔴 LIVE       👥 Online", 11f, cyan, true))
-
-        box.addView(
-            text(
-                when {
-                    name.contains("Gaming") -> "🎮"
-                    name.contains("Quiz") -> "❓"
-                    name.contains("StarLeo") -> "⭐"
-                    name.contains("Music") -> "🎙"
-                    else -> "😎"
-                },
-                43f,
-                cyan,
-                true
-            ).apply {
-                gravity = Gravity.CENTER
-                setPadding(0, dp(8), 0, dp(8))
-            }
-        )
-
-        box.addView(text("👑 $name", 13f, white, true))
-        box.addView(text(subtitle, 11f, muted))
-
-        box.addView(
-            text("⌂ Room $roomId", 11f, cyan, true).apply {
-                setPadding(0, dp(8), 0, dp(8))
-            }
-        )
-
-        box.addView(button("Join  ›") { action() })
-
-        return box
-    }
-
-    private fun addChatRow(
-    parent: LinearLayout,
-    name: String,
-    message: String,
-    icon: String,
-    unread: String,
-    action: () -> Unit
-) {
-    val row = neonCard().apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(10), dp(12), dp(10), dp(12))
-        setOnClickListener { action() }
-    }
-
-    row.addView(text(icon, 35f, cyan, true))
-
-    val labels = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(dp(10), 0, 0, 0)
-    }
-
-    labels.addView(text(name, 15f, white, true))
-    labels.addView(text(message, 12f, muted))
-
-    row.addView(
-        labels,
-        LinearLayout.LayoutParams(0, -2, 1f)
-    )
-
-    if (unread.isNotEmpty()) {
-        row.addView(
-            text(unread, 14f, white, true).apply {
-                background = rounded(
-                    intArrayOf(Color.RED, Color.rgb(210, 20, 60)),
-                    30
-                )
-                setPadding(dp(9), dp(5), dp(9), dp(5))
-            }
-        )
-    }
-
-    parent.addView(row, matchWrap(top = 8))
-}
-
     private fun addProfileOption(
         parent: LinearLayout,
         icon: String,
@@ -1632,70 +1092,6 @@ private fun showRoomSearch() {
         row.addView(text("›", 27f, muted, true))
 
         parent.addView(row, matchWrap(top = 8))
-    }
-
-    private fun neonBanner(
-        icon: String,
-        first: String,
-        second: String,
-        subtitle: String
-    ): LinearLayout {
-        val box = neonCard().apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(12), dp(14), dp(12), dp(14))
-        }
-
-        box.addView(text(icon, 38f, cyan, true))
-
-        val labels = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(10), 0, 0, 0)
-        }
-
-        labels.addView(text(first, 16f, white, true))
-        labels.addView(text(second, 23f, cyan, true))
-        labels.addView(text(subtitle, 11f, muted))
-
-        box.addView(labels)
-        box.addView(text("👑", 30f, Color.YELLOW, true))
-
-        return box
-    }
-
-    private fun chip(
-        title: String,
-        selected: Boolean,
-        action: () -> Unit
-    ): TextView {
-        return text(
-            title,
-            10f,
-            if (selected) white else muted,
-            true
-        ).apply {
-            gravity = Gravity.CENTER
-            setPadding(dp(5), dp(11), dp(5), dp(11))
-
-            background = rounded(
-                if (selected) {
-                    intArrayOf(
-                        Color.rgb(0, 150, 230),
-                        Color.rgb(65, 35, 210)
-                    )
-                } else {
-                    intArrayOf(
-                        Color.rgb(12, 20, 65),
-                        Color.rgb(20, 28, 75)
-                    )
-                },
-                24,
-                if (selected) cyan else Color.rgb(48, 66, 130),
-                1
-            )
-
-            setOnClickListener { action() }
-        }
     }
 
     private fun neonCard(): LinearLayout {
@@ -1777,22 +1173,22 @@ private fun showRoomSearch() {
     }
 
     private fun rounded(
-    colors: IntArray,
-    radius: Int,
-    stroke: Int = Color.TRANSPARENT,
-    strokeWidth: Int = 0
-): GradientDrawable {
-    return GradientDrawable(
-        GradientDrawable.Orientation.TL_BR,
-        colors
-    ).apply {
-        cornerRadius = dp(radius).toFloat()
+        colors: IntArray,
+        radius: Int,
+        stroke: Int = Color.TRANSPARENT,
+        strokeWidth: Int = 0
+    ): GradientDrawable {
+        return GradientDrawable(
+            GradientDrawable.Orientation.TL_BR,
+            colors
+        ).apply {
+            cornerRadius = dp(radius).toFloat()
 
-        if (strokeWidth > 0) {
-            setStroke(dp(strokeWidth), stroke)
+            if (strokeWidth > 0) {
+                setStroke(dp(strokeWidth), stroke)
+            }
         }
     }
-}
 
     private fun circleBackground(): GradientDrawable {
         return GradientDrawable().apply {
@@ -1807,12 +1203,6 @@ private fun showRoomSearch() {
             if (top > 0) {
                 topMargin = dp(top)
             }
-        }
-    }
-
-    private fun weighted(): LinearLayout.LayoutParams {
-        return LinearLayout.LayoutParams(0, -2, 1f).apply {
-            marginEnd = dp(5)
         }
     }
 
