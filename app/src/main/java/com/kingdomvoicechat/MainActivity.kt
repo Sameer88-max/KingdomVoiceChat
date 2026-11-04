@@ -377,7 +377,7 @@ return
         )
 
         content.addView(rewards, matchWrap(top = 18))
-
+// /*
         setContentView(root) // l
     }
 */
@@ -547,7 +547,7 @@ return
                     chat.first,
                     "Conversation UI will appear here after the chat backend is connected."
                 )
-                 /*
+                 // /*
             }
         }
 
