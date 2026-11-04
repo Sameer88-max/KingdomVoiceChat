@@ -11,7 +11,8 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.widget.*
-setSingleLine(true)
+import android.widget.*
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -382,6 +383,7 @@ return
         setContentView(root) // l
     }
 */
+ */
     // ROOMS SCREEN
 
     private fun showRooms() {val (root, content) = appRoot()
