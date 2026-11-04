@@ -377,7 +377,7 @@ return
         )
 
         content.addView(rewards, matchWrap(top = 18))
-/* 
+
         setContentView(root) // l
     }
 */
