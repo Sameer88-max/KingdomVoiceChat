@@ -1,3 +1,4 @@
+
 package com.kingdomvoicechat
 
 import android.content.Context
@@ -11,11 +12,23 @@ class BottomNavigation(
     private val currentTab: String,
     private val onTabSelected: (String) -> Unit
 ) {
+
+    private fun dp(value: Int): Int {
+        return (value * context.resources.displayMetrics.density).toInt()
+    }
+
     fun build(): LinearLayout {
+
         val nav = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(8, 8, 8, 8)
+            setPadding(
+                dp(8),
+                dp(6),
+                dp(8),
+                dp(30)
+            )
+            minimumHeight = dp(90)
             setBackgroundColor(Color.rgb(8, 15, 54))
         }
 
@@ -27,39 +40,58 @@ class BottomNavigation(
         )
 
         items.forEach { item ->
-            val cell = LinearLayout(context).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER
-                setPadding(4, 12, 4, 12)
-                setOnClickListener {
-                    onTabSelected(item.second)
-                }
-            }
 
             val active = currentTab == item.second
+
             val color = if (active) {
                 Color.CYAN
             } else {
                 Color.LTGRAY
             }
 
-            cell.addView(TextView(context).apply {
-                text = item.first
-                textSize = 23f
-                setTextColor(color)
+            val cell = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
-            })
+                setPadding(
+                    dp(4),
+                    dp(5),
+                    dp(4),
+                    dp(5)
+                )
 
-            cell.addView(TextView(context).apply {
-                text = item.second
-                textSize = 11f
-                setTextColor(color)
-                gravity = Gravity.CENTER
-            })
+                isClickable = true
+                isFocusable = true
+
+                setOnClickListener {
+                    onTabSelected(item.second)
+                }
+            }
+
+            cell.addView(
+                TextView(context).apply {
+                    text = item.first
+                    textSize = 23f
+                    setTextColor(color)
+                    gravity = Gravity.CENTER
+                }
+            )
+
+            cell.addView(
+                TextView(context).apply {
+                    text = item.second
+                    textSize = 11f
+                    setTextColor(color)
+                    gravity = Gravity.CENTER
+                }
+            )
 
             nav.addView(
                 cell,
-                LinearLayout.LayoutParams(0, 65, 1f)
+                LinearLayout.LayoutParams(
+                    0,
+                    dp(54),
+                    1f
+                )
             )
         }
 
