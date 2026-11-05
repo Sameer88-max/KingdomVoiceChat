@@ -1,17 +1,23 @@
-
 package com.kingdomvoicechat
 
 data class RoomModel(
     val roomId: String = "",
     val roomName: String = "Singing Fun Room",
     val ownerUid: String = "",
+    val ownerName: String = "",
+    val category: String = "General",
+    val onlineCount: Int = 0,
+    val isOnline: Boolean = false,
     val seatCount: Int = 20,
     val themeColor: String = "#101B70",
     val backgroundType: String = "default",
     val backgroundUri: String = "",
     val isLocked: Boolean = false,
     val status: String = "active"
-)
+) {
+    val ownerId: String
+        get() = ownerUid
+}
 
 data class RoomSeat(
     val seatNumber: Int = 0,
